@@ -14,7 +14,7 @@
   };
 
   var hdr = document.getElementById('site-header');
-  if (hdr) hdr.innerHTML = '<header class="hdr"><div class="wrap"><a class="brand" href="/"><i></i>' + esc(S.brand) + '</a>' +
+  if (hdr) hdr.innerHTML = '<header class="hdr"><div class="wrap"><a class="brand" href="/"><i><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></i>' + esc(S.brand) + '</a>' +
     '<nav class="nav" aria-label="Main"><a class="hide-sm" href="/#how">How it works</a><a href="/contractors">For contractors</a><a class="btn sm" href="/request">Get help now</a></nav></div></header>';
   var ftr = document.getElementById('site-footer');
   if (ftr) ftr.innerHTML = '<footer class="ftr"><div class="wrap"><span>' + esc(S.brand) + ' connects New Jersey homeowners with independent, licensed HVAC contractors. We don\'t perform the work.</span>' +
