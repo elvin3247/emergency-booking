@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Request emergency HVAC help</title>
+<meta name="description" content="Tell us what's wrong and we'll alert licensed New Jersey HVAC contractors who can come.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="narrow" id="app"></div></div></main>
+<div id="site-footer"></div>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+var app = document.getElementById('app');
+var Q = new URLSearchParams(location.search);
+var problem = Q.get('p');
+if (!SITE.problems[problem]) problem = null;
+var opts = function (list) { return list.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join(''); };
+var steps = function (n) { return '<ol class="steps">' + ['Problem', 'Details', 'Who can come', 'Connected'].map(function (s, i) { return '<li class="' + (i <= n ? 'on' : '') + '">' + (i + 1) + '. ' + s + '</li>'; }).join('') + '</ol>'; };
+
+function showProblems() {
+  app.innerHTML = '<div><h1>What\'s going on?</h1><p class="sub">Pick the closest match. Licensed contractors who can come will answer.</p></div>' + steps(0) +
+    '<div class="tiles" style="grid-template-columns:1fr 1fr">' + Object.entries(SITE.problems).map(function (e) { return '<button class="tile" type="button" data-p="' + e[0] + '"><b>' + e[1][0] + '</b><span>' + e[1][1] + '</span></button>'; }).join('') +
+    '<button class="tile danger" type="button" data-p="gas"><b>Gas smell or CO alarm</b><span>Read this first</span></button></div>' +
+    '<p class="small sub">Free for homeowners. You pay the contractor directly for the visit and any repair.</p>';
+}
+function showGas() {
+  app.innerHTML = steps(0) + '<div class="notice crit"><h2>Leave the house first</h2><p style="margin-top:8px">If you smell gas or a carbon monoxide alarm is sounding, get everyone outside now. Then call 911 or your gas utility\'s emergency line from outside. Don\'t use light switches or anything that could spark.</p></div>' +
+    '<p class="sub">' + esc(SITE.brand) + ' is for repairs, not gas leaks. Once the utility says it\'s safe, come back and we\'ll find someone to fix the equipment.</p><div><button class="btn ghost" type="button" data-back>Back</button></div>';
+}
+function showForm() {
+  app.innerHTML = '<div><h1>' + SITE.problems[problem][0] + '</h1><p class="sub">A few details so contractors know if they can help.</p></div>' + steps(1) +
+    '<form class="card" id="f" novalidate>' +
+    '<div class="row"><div><label for="zip">ZIP code</label><input type="text" id="zip" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div>' +
+    '<div><label for="county">County</label><select id="county"><option value="">Choose your county</option>' + opts(SITE.counties) + '</select></div></div>' +
+    '<div class="row"><div><label for="timing">How soon?</label><select id="timing">' + opts(SITE.timings) + '</select></div>' +
+    '<div><label for="system">What kind of system?</label><select id="system">' + opts(SITE.systems) + '</select></div></div>' +
+    '<div><label for="note">Anything else? (optional)</label><textarea id="note" maxlength="500" placeholder="Example: furnace clicks but won\'t light"></textarea></div>' +
+    '<div class="row"><div><label for="name">Your name</label><input type="text" id="name" autocomplete="name"></div>' +
+    '<div><label for="phone">Phone number</label><input type="tel" id="phone" autocomplete="tel"></div></div>' +
+    '<div><label for="email">Email</label><input type="email" id="email" autocomplete="email"><p class="small sub" style="margin-top:4px">We email you when a contractor says yes.</p></div>' +
+    '<div><label for="address">Street address</label><input type="text" id="address" autocomplete="street-address"><p class="small sub" style="margin-top:4px">Your name, phone, email, and address go only to the contractor you choose.</p></div>' +
+    '<div class="hp" aria-hidden="true"><label for="website">Leave this empty</label><input type="text" id="website" tabindex="-1" autocomplete="off"></div>' +
+    '<label class="check" for="consent"><input type="checkbox" id="consent"><span>' + esc(SITE.consent.homeowner) + ' See our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</span></label>' +
+    '<p class="err" id="err" role="alert" hidden></p>' +
+    '<div class="btns"><button class="btn" type="submit" id="go">Find who can come</button><button class="btn ghost" type="button" data-back>Back</button></div></form>';
+  // Carry over anything chosen on the home page.
+  if (SITE.counties.indexOf(Q.get('county')) > -1) document.getElementById('county').value = Q.get('county');
+  if (SITE.timings.indexOf(Q.get('timing')) > -1) document.getElementById('timing').value = Q.get('timing');
+}
+app.addEventListener('click', function (e) {
+  var t = e.target.closest('[data-p]');
+  if (t) { if (t.dataset.p === 'gas') return showGas(); problem = t.dataset.p; showForm(); window.scrollTo(0, 0); return; }
+  if (e.target.closest('[data-back]')) { problem = null; showProblems(); }
+});
+app.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  var v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
+  err.hidden = true; go.disabled = true; go.textContent = 'Sending...';
+  try {
+    var out = await api('/api/requests', { problem: problem, zip: v('zip'), county: v('county'), timing: v('timing'), system: v('system'), note: v('note'), name: v('name'), phone: v('phone'), email: v('email'), address: v('address'), website: v('website'), consent: document.getElementById('consent').checked });
+    location.href = '/status?t=' + encodeURIComponent(out.token);
+  } catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Find who can come'; }
+});
+problem ? showForm() : showProblems();
+</script>
+</body>
+</html>

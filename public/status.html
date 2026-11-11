@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Your request</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="narrow" id="app"><p class="sub">Loading your request...</p></div></div></main>
+<div id="site-footer"></div>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+var app = document.getElementById('app'), token = new URLSearchParams(location.search).get('t');
+var D = null, skew = 0, confirming = null, busy = false, poll;
+var steps = function (n) { return '<ol class="steps">' + ['Problem', 'Details', 'Who can come', 'Connected'].map(function (s, i) { return '<li class="' + (i <= n ? 'on' : '') + '">' + (i + 1) + '. ' + s + '</li>'; }).join('') + '</ol>'; };
+var left = function () { return (D.window_ends - (Date.now() + skew)) / 1000; };
+var summary = function () { var r = D.request; return SITE.problems[r.problem][0] + ' · ' + esc(r.zip) + ' · ' + esc(r.timing); };
+var backup = function () {
+  if (!D.backup || !D.backup.length) return '';
+  return '<div class="card"><h3>Contractors you can call directly</h3><p class="small sub">Licensed and signed up in ' + esc(D.request.county) + ' County, but not confirmed available right now.</p>' +
+    D.backup.map(function (c) { return '<div class="split"><div><b>' + esc(c.company) + '</b><div class="small sub">License ' + esc(c.license) + '</div></div><b style="font-variant-numeric:tabular-nums">' + esc(c.phone) + '</b></div>'; }).join('') + '</div>';
+};
+
+function render() {
+  var h = '', n = D.offers.length;
+  if (D.state === 'matched') {
+    var c = D.chosen;
+    h = '<div><h1>You\'re connected</h1><p class="sub">' + esc(c.company) + ' has your details and will contact you to confirm.</p></div>' + steps(3) +
+      '<div class="card"><div class="split"><h2>' + esc(c.company) + '</h2><span class="pill ok">Confirmed</span></div>' +
+      '<dl class="kv"><dt>Arrives</dt><dd>' + esc(c.arrival) + '</dd><dt>Visit fee</dt><dd>$' + esc(c.visit_fee) + ', paid to the contractor</dd><dt>Their phone</dt><dd>' + esc(c.phone) + '</dd><dt>License</dt><dd>' + esc(c.license) + '</dd><dt>Your request</dt><dd>' + SITE.problems[D.request.problem][0] + ' at ' + esc(D.request.address) + ', ' + esc(D.request.zip) + '</dd></dl></div>' +
+      '<div class="card"><h3>What happens next</h3><ul class="plain"><li>The contractor calls or texts you to confirm the time.</li><li>You pay them for the visit and any repair you approve.</li><li>If you don\'t hear from them, call the number above.</li></ul></div>';
+  } else if (D.state === 'closed') {
+    h = '<div><h1>This request has closed</h1><p class="sub">Requests stay open for ' + SITE.openHours + ' hours. If you still need help, start a new one.</p></div>' + backup() + '<div><a class="btn" href="/request">Start a new request</a></div>';
+  } else if (n) {
+    h = '<div><h1>Choose who comes</h1><p class="sub">' + (n === 1 ? 'This contractor' : 'These contractors') + ' said yes. Pick one any time, or wait to see if more respond.</p></div>' + steps(2) +
+      '<div class="card"><div class="split"><div><span class="pill ok"><span class="pulse"></span>' + n + ' of up to ' + SITE.maxOffers + ' said yes</span><div class="small sub" style="margin-top:6px">' + summary() + '</div></div></div></div>' +
+      D.offers.map(function (o) {
+        var pick = confirming === o.id
+          ? '<p class="small">This shares your name, phone, email, and address with ' + esc(o.company) + '.</p><div class="btns"><button class="btn" type="button" data-confirm="' + o.id + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Connecting...' : 'Yes, connect us') + '</button><button class="btn ghost" type="button" data-cancel>Not yet</button></div>'
+          : '<div><button class="btn" type="button" data-choose="' + o.id + '">Choose ' + esc(o.company) + '</button></div>';
+        return '<div class="card"><div><h3>' + esc(o.company) + '</h3><div class="small sub">NJ HVACR license ' + esc(o.license) + '</div></div>' +
+          '<dl class="facts"><div><dt>Arrives</dt><dd>' + esc(o.arrival) + '</dd></div><div><dt>Visit fee</dt><dd>$' + esc(o.visit_fee) + '</dd></div><div><dt>Said yes in</dt><dd>' + (o.secs < 3600 ? mmss(o.secs) : Math.round(o.secs / 3600) + ' hr') + '</dd></div></dl>' + pick + '</div>';
+      }).join('') +
+      '<p class="err" id="err" role="alert" hidden></p><p class="small sub">The visit fee covers the trip and diagnosis and is paid to the contractor. Repairs are quoted on site.</p>';
+  } else if (!D.alerted) {
+    h = '<div><h1>No contractor near you yet</h1><p class="sub">We don\'t have a contractor signed up for ' + esc(D.request.county) + ' County at this hour. We won\'t pretend otherwise.</p></div>' + steps(2) +
+      '<div class="notice warn">Our team has your request and has been told about the gap. If a contractor becomes available, we\'ll email you.</div>' + backup() +
+      '<p class="small sub">' + summary() + '</p>';
+  } else if (left() > 0) {
+    h = '<div><h1>Alerting nearby contractors</h1><p class="sub">We alerted ' + D.alerted + ' licensed contractor' + (D.alerted === 1 ? '' : 's') + ' covering ' + esc(D.request.county) + ' County. Answers show up here, and we\'ll email you too.</p></div>' + steps(2) +
+      '<div class="card"><div class="split"><div><span class="pill wait"><span class="pulse"></span>Waiting for a yes</span><div class="small sub" style="margin-top:6px">' + summary() + '</div></div><div style="text-align:right"><div class="timer" id="timer">' + mmss(left()) + '</div><div class="small sub">until we show backups</div></div></div></div>' +
+      '<p class="small sub">You can close this page. Your link is in your email.</p>';
+  } else {
+    h = '<div><h1>No one has confirmed yet</h1><p class="sub">We alerted ' + D.alerted + ' contractor' + (D.alerted === 1 ? '' : 's') + ' and none has accepted in ' + SITE.windowMin + ' minutes. Here\'s what you can do now.</p></div>' + steps(2) + backup() +
+      '<div class="notice warn">Your request stays open. If a contractor accepts later, it appears here and we email you.</div><p class="small sub">' + summary() + '</p>';
+  }
+  app.innerHTML = h;
+}
+async function load() {
+  try {
+    var d = await api('/api/requests?token=' + encodeURIComponent(token || ''));
+    D = d; skew = d.now - Date.now();
+    if (!busy) render();
+    if (d.state !== 'open') clearInterval(poll);
+  } catch (e) {
+    if (!D) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div><div><a class="btn" href="/request">Start a new request</a></div>'; clearInterval(poll); }
+  }
+}
+app.addEventListener('click', async function (e) {
+  var c = e.target.closest('[data-choose]'), y = e.target.closest('[data-confirm]');
+  if (c) { confirming = c.dataset.choose; render(); }
+  else if (e.target.closest('[data-cancel]')) { confirming = null; render(); }
+  else if (y && !busy) {
+    busy = true; render();
+    try { await api('/api/choose', { token: token, offer_id: y.dataset.confirm }); busy = false; confirming = null; await load(); window.scrollTo(0, 0); }
+    catch (x) { busy = false; confirming = null; await load(); var err = document.getElementById('err'); if (err) { err.textContent = x.message; err.hidden = false; } }
+  }
+});
+var wasWaiting = false;
+setInterval(function () {
+  if (!D || D.state !== 'open' || D.offers.length || !D.alerted) return;
+  var t = document.getElementById('timer');
+  if (left() > 0) { wasWaiting = true; if (t) t.textContent = mmss(left()); }
+  else if (wasWaiting) { wasWaiting = false; load(); }
+}, 1000);
+poll = setInterval(function () { if (!confirming) load(); }, 5000);
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Job request</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="narrow" id="app"><p class="sub">Loading the request...</p></div></div></main>
+<div id="site-footer"></div>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+var app = document.getElementById('app'), t = new URLSearchParams(location.search).get('t'), D = null, poll;
+function render(msg) {
+  var r = D.request, s = D.state, c = D.customer;
+  var h = '<div><h1>' + SITE.problems[r.problem][0] + '</h1><p class="sub">Request for ' + esc(D.company) + '</p></div>' +
+    '<div class="card"><dl class="kv"><dt>Where</dt><dd>' + esc(r.county) + ' County, ZIP ' + esc(r.zip) + '</dd><dt>When</dt><dd>' + esc(r.timing) + '</dd><dt>System</dt><dd>' + esc(r.system) + '</dd>' + (r.note ? '<dt>Notes</dt><dd>' + esc(r.note) + '</dd>' : '') +
+    '<dt>Customer</dt><dd>' + (c ? esc(c.name) + '<br>' + esc(c.phone) + '<br>' + esc(c.email) + '<br>' + esc(c.address) + ', ' + esc(r.zip) : 'Shared if they choose you') + '</dd></dl>';
+  if (s === 'open' || s === 'declined') {
+    h += (s === 'declined' ? '<div class="notice warn"><b>You passed on this one.</b> No charge and no penalty. Changed your mind? You can still say yes below.</div>' : '') +
+      '<div class="row"><div><label for="arrival">When can you arrive?</label><select id="arrival">' + SITE.arrivals.map(function (a) { return '<option>' + a + '</option>'; }).join('') + '</select></div>' +
+      '<div><label for="fee">Your visit fee ($)</label><input type="number" id="fee" min="0" max="1000" step="1" value="' + esc(D.mine.visit_fee) + '"></div></div>' +
+      '<p class="small sub">' + (D.free_leads_left > 0 ? 'You have ' + D.free_leads_left + ' free lead' + (D.free_leads_left === 1 ? '' : 's') + ' left, so this one costs nothing if you\'re chosen.' : 'You pay $' + SITE.leadFee + ' only if the customer chooses you.') + ' Saying no never counts against you.</p>' +
+      '<p class="err" id="err" role="alert" hidden></p>' +
+      '<div class="btns"><button class="btn" type="button" data-act="accept">Yes, I can take it</button>' + (s === 'open' ? '<button class="btn ghost" type="button" data-act="decline">Can\'t take this one</button>' : '') + '</div>';
+  } else if (s === 'accepted') {
+    h += '<div class="notice warn"><b>You said yes.</b> The customer sees: ' + esc(D.mine.arrival) + ', $' + esc(D.mine.visit_fee) + ' visit fee. We\'ll email you the moment they choose. This page updates too.</div>' +
+      '<div><button class="btn ghost sm" type="button" data-act="decline">I can\'t make it after all</button></div>';
+  } else if (s === 'chosen') {
+    h += '<div class="notice good"><b>The customer chose you.</b> Call them now to confirm your arrival: ' + esc(D.mine.arrival) + ', $' + esc(D.mine.visit_fee) + ' visit fee. ' + (D.lead_fee ? 'Lead fee for this job: $' + esc(D.lead_fee) + '.' : 'This lead is free.') + '</div>';
+  } else if (s === 'filled') {
+    h += '<div class="notice warn"><b>Filled by another contractor.</b> No charge. Thanks for answering.</div>';
+  } else if (s === 'full') {
+    h += '<div class="notice warn"><b>This request already has ' + SITE.maxOffers + ' contractors.</b> We cap it so customers aren\'t overwhelmed. No charge.</div>';
+  } else {
+    h += '<div class="notice warn"><b>This request has closed.</b> No charge.</div>';
+  }
+  app.innerHTML = h + '</div>';
+  if (msg) { var e = document.getElementById('err'); if (e) { e.textContent = msg; e.hidden = false; } }
+}
+async function load() {
+  try { D = await api('/api/alerts?t=' + encodeURIComponent(t || '')); render(); if (['chosen', 'filled', 'closed'].includes(D.state)) clearInterval(poll); }
+  catch (e) { if (!D) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div>'; clearInterval(poll); } }
+}
+app.addEventListener('click', async function (e) {
+  var b = e.target.closest('[data-act]'); if (!b) return;
+  var body = { t: t, action: b.dataset.act };
+  if (body.action === 'accept') { body.arrival = document.getElementById('arrival').value; body.visit_fee = document.getElementById('fee').value; }
+  b.disabled = true;
+  try { D = await api('/api/alerts', body); render(); }
+  catch (x) { try { D = await api('/api/alerts?t=' + encodeURIComponent(t)); } catch (y) {} render(x.message); }
+});
+// Refresh while waiting on the customer; don't redraw the form while someone is filling it in.
+poll = setInterval(function () { if (D && D.state === 'accepted') load(); }, 5000);
+load();
+</script>
+</body>
+</html>

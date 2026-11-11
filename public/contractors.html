@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>For HVAC contractors</title>
+<meta name="description" content="Get emergency HVAC requests in the New Jersey counties and hours you choose. Pay only when a customer chooses you.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="narrow" id="app"></div></div></main>
+<div id="site-footer"></div>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+var app = document.getElementById('app');
+app.innerHTML = '<div><h1>Emergency HVAC jobs, only when you want them</h1><p class="sub">Homeowners near you who need help now. You answer only the requests you can take.</p></div>' +
+  '<div class="card"><ul class="plain"><li><b>Your first ' + SITE.freeLeads + ' chosen leads are free.</b> After that, $' + SITE.leadFee + ' per lead, only when a customer chooses you.</li><li>No monthly fee and no contract.</li><li>Each lead goes to one contractor: the one the customer chose.</li><li>Saying no to a request never counts against you.</li><li>For now, alerts arrive by email with a link to respond. Text alerts are coming.</li></ul></div>' +
+  '<form class="card" id="f" novalidate>' +
+  '<div class="row"><div><label for="company">Company name</label><input type="text" id="company" autocomplete="organization"></div><div><label for="contact">Your name</label><input type="text" id="contact" autocomplete="name"></div></div>' +
+  '<div class="row"><div><label for="email">Email for job alerts</label><input type="email" id="email" autocomplete="email"></div><div><label for="mobile">Mobile number</label><input type="tel" id="mobile" autocomplete="tel"></div></div>' +
+  '<div class="row"><div><label for="business_phone">Business phone customers call</label><input type="tel" id="business_phone"></div><div><label for="license">NJ HVACR license number</label><input type="text" id="license" placeholder="19HC00000000"></div></div>' +
+  '<div><label id="counties-l">Counties you serve</label><div class="chips" role="group" aria-labelledby="counties-l">' + SITE.counties.map(function (c, i) { return '<label class="chip" for="c' + i + '"><input type="checkbox" id="c' + i + '" value="' + c + '"><span>' + c + '</span></label>'; }).join('') + '</div></div>' +
+  '<div class="row"><div><label for="visit_fee">Visit fee customers will see ($)</label><input type="number" id="visit_fee" min="0" max="1000" step="1"></div><div><label for="alert_hours">When should we alert you?</label><select id="alert_hours">' + Object.entries(SITE.alertHours).map(function (e) { return '<option value="' + e[0] + '">' + e[1] + '</option>'; }).join('') + '</select></div></div>' +
+  '<p class="small sub">You can change your visit fee on each request.</p>' +
+  '<div class="hp" aria-hidden="true"><label for="website">Leave this empty</label><input type="text" id="website" tabindex="-1" autocomplete="off"></div>' +
+  '<label class="check" for="consent"><input type="checkbox" id="consent"><span>' + esc(SITE.consent.contractor) + ' See our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</span></label>' +
+  '<p class="err" id="err" role="alert" hidden></p><div><button class="btn" type="submit" id="go">Apply to join</button></div></form>';
+app.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  var v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
+  err.hidden = true; go.disabled = true; go.textContent = 'Sending...';
+  try {
+    await api('/api/contractors', { company: v('company'), contact: v('contact'), email: v('email'), mobile: v('mobile'), business_phone: v('business_phone'), license: v('license'), visit_fee: v('visit_fee'), alert_hours: v('alert_hours'), website: v('website'),
+      counties: Array.prototype.map.call(document.querySelectorAll('.chip input:checked'), function (i) { return i.value; }), consent: document.getElementById('consent').checked });
+    app.innerHTML = '<div><h1>Application received</h1><p class="sub">Thanks. We check your New Jersey HVACR license with the state board before you receive any requests, then email you when you\'re approved.</p></div><div><a class="btn ghost" href="/">Back to home</a></div>';
+    window.scrollTo(0, 0);
+  } catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Apply to join'; }
+});
+</script>
+</body>
+</html>
