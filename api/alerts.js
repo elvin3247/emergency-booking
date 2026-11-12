@@ -18,7 +18,7 @@ async function load(t) {
 function view({ alert, request: r, contractor, state }) {
   const out = {
     state, company: contractor.company,
-    request: { problem: r.problem, zip: r.zip, county: r.county, timing: r.timing, system: r.system, note: r.note },
+    request: { service: r.service, problem: r.problem, zip: r.zip, county: r.county, timing: r.timing, system: r.system, note: r.note },
     mine: { arrival: alert.arrival, visit_fee: alert.visit_fee == null ? contractor.visit_fee : alert.visit_fee },
     free_leads_left: contractor.free_leads_left, manage: contractor.manage_token
   };

@@ -1,4 +1,5 @@
 // Troubleshooting guides shown at /help/<key>. Plain homeowner checks only: nothing that needs tools or opening equipment.
+// A guide only gets a page while its service is switched on in config.js. `danger` replaces the gas warning at the top.
 // Edit the wording here, then run `npm run build`.
 module.exports = {
   'no-heat': {
@@ -81,5 +82,54 @@ module.exports = {
     ],
     stop: ['The screen stays blank after new batteries and a breaker check.', 'The thermostat clicks but nothing starts.', 'The breaker trips again after you reset it.', 'The system runs constantly and ignores the setting.'],
     meanwhile: ['Write down the thermostat brand and model for the contractor.', 'If the system is stuck on, you can turn it off at its breaker.', 'In freezing weather, protect pipes by opening cabinet doors and letting faucets drip.']
+  },
+  'burst-pipe': {
+    title: 'Burst or leaking pipe? What to do in the first 5 minutes',
+    h1: 'Burst or leaking pipe? Do this first',
+    desc: 'Water spraying or dripping from a pipe, ceiling, or wall: how to shut the water off, limit the damage, and get a licensed New Jersey plumber out fast.',
+    intro: 'The first few minutes matter most. Stopping the water comes before anything else, and you can do it without tools.',
+    danger: 'Water near outlets, the electrical panel, or a sagging ceiling?',
+    checks: [
+      ['Shut off the main water valve', 'It is usually where the water line enters the house: in the basement, a crawl space, or a utility closet, often near the water meter. Turn a round handle clockwise until it stops, or turn a lever a quarter turn so it sits across the pipe.'],
+      ['Open a faucet', 'Run cold water at the lowest faucet in the house to drain what is left in the pipes and take the pressure off the leak.'],
+      ['Keep water away from electricity', 'If water is near outlets, appliances, or the panel, turn off the breakers for that area, but only if you can reach the panel without standing in water.'],
+      ['Catch and soak it up', 'Put a bucket under the drip and use towels or a wet vacuum on the floor. Move rugs, boxes, and furniture out of the way.'],
+      ['Watch the ceiling', 'A bulging ceiling is holding water and can come down. Keep people out from under it and tell the plumber.'],
+      ['Find the spot if you can', 'Note where the water is coming from and whether it stopped once the main was off. That tells the plumber a lot before they arrive.']
+    ],
+    stop: ['Water keeps flowing with the main valve off.', 'You cannot find or turn the main valve.', 'Water reached outlets, wiring, or the electrical panel.', 'A ceiling is sagging or dripping in more than one place.'],
+    meanwhile: ['Leave the main water off until the pipe is repaired.', 'Take photos of the damage for any insurance claim.', 'In freezing weather, keep the heat on so other pipes do not freeze.']
+  },
+  'clog': {
+    title: 'Clogged drain or sewer backup? 5 things to check first',
+    h1: 'Clogged drain or backup? Check these first',
+    desc: 'Sink, tub, or toilet backing up? Five safe checks that tell you whether it is one drain or the main line, and when to call a licensed New Jersey plumber.',
+    intro: 'One slow drain is usually a small job. Water coming up in several places at once means the main line, and that needs a plumber.',
+    danger: 'Sewage backing up near outlets or appliances?',
+    checks: [
+      ['Stop running water', 'Do not flush, run the dishwasher, or start the washer until you know where the clog is. More water has nowhere to go.'],
+      ['See how many drains are affected', 'One sink or one toilet points to a local clog. A toilet that bubbles when the sink drains, or water coming up in a tub or floor drain, points to the main line.'],
+      ['Try a plunger', 'For a single toilet or sink, a plunger with a good seal and a dozen firm strokes clears many clogs. Use a flange plunger for toilets.'],
+      ['Skip the chemical cleaner', 'Drain chemicals often fail on a full clog and leave caustic water sitting in the pipe, which is a hazard for you and the plumber.'],
+      ['Check the lowest drain', 'Look at the basement floor drain or lowest shower. Water or sewage there confirms a main line backup.']
+    ],
+    stop: ['Sewage is coming up through a floor drain, tub, or shower.', 'More than one fixture is backing up.', 'Plunging does nothing, or the clog returns within a day.', 'You already poured in drain chemicals. Tell the plumber so they can protect themselves.'],
+    meanwhile: ['Keep children and pets away from any sewage.', 'Do not run water anywhere in the house during a main line backup.', 'Wear gloves for cleanup and wash your hands well afterward.']
+  },
+  'no-hot-water': {
+    title: 'No hot water? 6 things to check before you call',
+    h1: 'No hot water? Check these first',
+    desc: 'Water heater not heating, or running out fast? Six safe checks for gas and electric tanks, and when to call a licensed New Jersey plumber.',
+    intro: 'A tripped breaker or a pilot light that went out causes many no-hot-water calls. These checks take a few minutes and need no tools.',
+    checks: [
+      ['Check more than one faucet', 'If only one faucet runs cold, the problem is at that fixture, not the water heater.'],
+      ['Electric tank: check the breaker', 'Look for a tripped breaker labeled water heater. Reset it once. If it trips again, leave it off and call.'],
+      ['Gas tank: look at the status light or pilot', 'Many gas heaters have a small window or a blinking light near the bottom. If the pilot is out, the relighting steps are printed on the tank. Only follow them if you do not smell gas.'],
+      ['Check the temperature dial', 'Someone may have turned it down or set it to vacation mode. Most homes use about 120 degrees.'],
+      ['Think about recent use', 'Back-to-back showers, laundry, and the dishwasher can empty a tank. Give it an hour and try again.'],
+      ['Look for water around the tank', 'A puddle under the heater means a leak, which is a different problem. Start a request for a leaking water heater instead.']
+    ],
+    stop: ['You smell gas near the water heater. Leave and call 911 or your gas utility from outside.', 'The breaker trips a second time.', 'The pilot will not stay lit.', 'You see water, rust streaks, or scorch marks on the tank.'],
+    meanwhile: ['Do not turn the temperature dial to its highest setting to make up for it.', 'If the tank is leaking, shut the cold water valve on the pipe above it.', 'Note the brand and the age on the label for the plumber.']
   }
 };

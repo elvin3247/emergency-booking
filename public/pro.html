@@ -9,10 +9,10 @@
 <!-- seo:end -->
 <!-- head:start -->
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#FFC72C">
+<meta name="theme-color" content="#E9EDF1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
 <!-- head:end -->
 </head>
@@ -37,7 +37,8 @@ function settingsForm(first) {
     '<div class="row"><div><label for="visit_fee">Visit fee customers see ($)</label><input type="number" id="visit_fee" min="0" max="1000" step="1" inputmode="numeric" value="' + esc(D.visit_fee == null ? '' : D.visit_fee) + '"><p class="small sub" style="margin-top:4px">For the trip and diagnosis. You can change it on any job.</p></div>' +
     '<div><label for="business_phone">Business phone customers call</label><input type="tel" id="business_phone" autocomplete="tel" value="' + esc(D.business_phone || '') + '"></div></div>' +
     '<div><label for="alert_hours">When should we send requests?</label><select id="alert_hours">' + Object.keys(SITE.alertHours).map(function (k) { return '<option value="' + k + '"' + (k === D.alert_hours ? ' selected' : '') + '>' + SITE.alertHours[k] + '</option>'; }).join('') + '</select></div>' +
-    (first ? '' : '<div><label id="counties-l">Counties you serve</label><div class="chips" role="group" aria-labelledby="counties-l">' + SITE.counties.map(function (c, i) { return '<label class="chip" for="c' + i + '"><input type="checkbox" id="c' + i + '" value="' + c + '"' + (D.counties.indexOf(c) > -1 ? ' checked' : '') + '><span>' + c + '</span></label>'; }).join('') + '</div></div>') +
+    (first ? '' : '<div><label id="trades-l">Work you do</label><div class="chips" role="group" aria-labelledby="trades-l" id="trades">' + Object.keys(SITE.trades).map(function (k) { return '<label class="chip" for="t-' + k + '"><input type="checkbox" id="t-' + k + '" value="' + k + '"' + (D.trades.indexOf(k) > -1 ? ' checked' : '') + '><span>' + SITE.trades[k].name + '</span></label>'; }).join('') + '</div><p class="small sub" style="margin-top:4px">Adding a trade? Email us the license number for it so we can check it.</p></div>') +
+    (first ? '' : '<div><label id="counties-l">Counties you serve</label><div class="chips" role="group" aria-labelledby="counties-l" id="chips">' + SITE.counties.map(function (c, i) { return '<label class="chip" for="c' + i + '"><input type="checkbox" id="c' + i + '" value="' + c + '"' + (D.counties.indexOf(c) > -1 ? ' checked' : '') + '><span>' + c + '</span></label>'; }).join('') + '</div></div>') +
     '<p class="err" id="err" role="alert" hidden></p>' +
     '<div><button class="btn" type="submit" id="go">' + (first ? 'Finish setup' : 'Save changes') + '</button></div></form>';
 }
@@ -45,12 +46,12 @@ function settingsForm(first) {
 function render() {
   var h = '';
   if (!D.setup_complete) {
-    h = '<div><p class="eyebrow">Step 2 of 2</p><h1>Finish your setup</h1><p class="sub">Two details and you\'re done. Customers see both before they choose you.</p></div>' + settingsForm(true);
+    h = '<div class="stack"><p class="eyebrow">Step 2 of 2</p><h1>Finish your setup</h1><p class="sub">Two details and you\'re done. Customers see both before they choose you.</p></div>' + settingsForm(true);
   } else {
     var paused = !!D.paused_until, pending = D.status !== 'approved';
-    h = '<div><p class="eyebrow">' + esc(D.company) + '</p><h1>Your alerts</h1></div>';
+    h = '<div class="stack"><p class="eyebrow">' + esc(D.company) + '</p><h1>Your alerts</h1></div>';
     h += pending
-      ? '<div class="notice warn"><b>We\'re checking your NJ HVACR license.</b> Requests start once you\'re approved. We\'ll email ' + esc(D.email) + '.</div>'
+      ? '<div class="notice warn"><b>We\'re checking your New Jersey license.</b> Requests start once you\'re approved. We\'ll email ' + esc(D.email) + '.</div>'
       : paused
         ? '<div class="notice warn"><b>Paused until ' + esc(when(D.paused_until)) + '.</b> You won\'t get requests until then.</div>'
         : D.in_hours
@@ -83,7 +84,7 @@ app.addEventListener('submit', async function (e) {
   e.preventDefault();
   var first = !D.setup_complete, v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
   var body = { t: t, action: 'settings', visit_fee: v('visit_fee'), business_phone: v('business_phone'), alert_hours: v('alert_hours') };
-  if (!first) body.counties = Array.prototype.map.call(document.querySelectorAll('.chip input:checked'), function (i) { return i.value; });
+  if (!first) { var picked = function (sel) { return Array.prototype.map.call(document.querySelectorAll(sel + ' input:checked'), function (i) { return i.value; }); }; body.counties = picked('#chips'); body.trades = picked('#trades'); }
   err.hidden = true; go.disabled = true; go.textContent = 'Saving...';
   try { D = await api('/api/pro', body); render(); toast(first ? 'Setup complete.' : 'Saved.'); if (first) { track('contractor_setup_done'); window.scrollTo(0, 0); } }
   catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = first ? 'Finish setup' : 'Save changes'; }

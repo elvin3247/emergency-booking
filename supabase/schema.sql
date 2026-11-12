@@ -9,7 +9,8 @@ create table if not exists contractors (
   email text not null unique,          -- job alerts go here until texting is added
   mobile text not null,                -- for text alerts later
   business_phone text,                 -- shown to customers; set in step 2 of sign-up
-  license text not null,               -- NJ HVACR license number; verify before approving
+  license text not null,               -- NJ license number(s) for their trades; verify before approving
+  trades text[] not null default '{hvac}',   -- hvac | plumbing | electrical | appliance
   counties text[] not null,
   visit_fee integer,                   -- set in step 2 of sign-up; no alerts until it is
   alert_hours text not null default 'any',   -- any | day | weekday | nights
@@ -25,11 +26,12 @@ create table if not exists requests (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   token text not null unique,          -- homeowner's private status link
+  service text,                        -- heating | cooling | plumbing | water-heater | electrical | appliances
   problem text not null,
   zip text not null,
   county text not null,
   timing text not null,
-  system text not null,
+  system text,                         -- heating and cooling requests only
   note text,
   name text not null,
   phone text not null,
@@ -71,6 +73,12 @@ alter table contractors add column if not exists manage_token text unique defaul
 alter table contractors add column if not exists paused_until timestamptz;
 alter table contractors alter column visit_fee drop not null;
 alter table contractors alter column business_phone drop not null;
+
+-- More than heating and cooling (safe to run again on an existing database).
+alter table contractors add column if not exists trades text[] not null default '{hvac}';
+alter table requests add column if not exists service text;
+alter table requests alter column system drop not null;
+create index if not exists contractors_trades_idx on contractors using gin(trades);
 
 -- The site only talks to the database from server functions using the service role key.
 -- Row level security with no policies blocks everything else.

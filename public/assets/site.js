@@ -1,4 +1,4 @@
-// Shared on every page: header, footer, helpers, the booking bar, live coverage, and visit tracking.
+// Shared on every page: header, footer, helpers, the booking card, live coverage, and visit tracking.
 (function () {
   var S = window.SITE;
   var byId = function (id) { return document.getElementById(id); };
@@ -43,34 +43,68 @@
   var open = null; try { open = JSON.parse(LS.get('req') || 'null'); } catch (e) {}
   if (open && Date.now() - open.at > S.openHours * 3600000) { LS.del('req'); open = null; }
 
+  var slug = function (county) { return county.toLowerCase().replace(/ /g, '-') + '-county-nj'; };
+  var liveTrades = []; Object.keys(S.services).forEach(function (k) { var t = S.services[k].trade; if (S.services[k].live && liveTrades.indexOf(t) < 0) liveTrades.push(t); });
+  window.svcIcon = function (k) { return '<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (S.icons[k] || '') + '</svg></span>'; };
+
   var hdr = byId('site-header');
-  if (hdr) hdr.innerHTML = '<header class="hdr"><div class="wrap"><a class="brand" href="/"><i><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></i>' + esc(S.brand) + '</a>' +
-    '<nav class="nav" aria-label="Main"><a class="hide-sm" href="/#how">How it works</a><a class="hide-sm" href="/help">Quick checks</a><a href="/contractors">For contractors</a><a class="btn sm" href="/request">Get help now</a></nav></div></header>' +
-    (open && !/^\/(status|respond)/.test(location.pathname) ? '<div class="openreq"><div class="wrap"><span>You have a request in progress on this device.</span><a class="btn sm dark" href="/status?t=' + encodeURIComponent(open.t) + '">View your request</a></div></div>' : '');
+  if (hdr) hdr.innerHTML =
+    (open && !/^\/(status|respond)/.test(location.pathname) ? '<div class="openreq"><div class="wrap"><span>You have a request in progress on this device.</span><a class="btn sm dark" href="/status?t=' + encodeURIComponent(open.t) + '">View your request</a></div></div>' : '') +
+    '<header class="hdr"><div class="wrap"><a class="brand" href="/"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>' + esc(S.brand) + '</a>' +
+    '<nav class="nav" aria-label="Main"><a class="hide-sm" href="/#services">Services</a><a class="hide-sm" href="/#how">How it works</a><a class="hide-sm" href="/help">Quick checks</a><a class="hide-sm" href="/contractors">For pros</a><a class="btn sm" href="/request">Get help now</a></nav></div></header>';
   var ftr = byId('site-footer');
-  if (ftr) ftr.innerHTML = '<footer class="ftr"><div class="wrap"><span>' + esc(S.brand) + ' connects New Jersey homeowners with independent, licensed HVAC contractors. We don\'t perform the work.</span>' +
-    '<nav aria-label="Footer"><a href="/hvac">Service areas</a><a href="/help">Quick checks</a><a href="/contractors">For contractors</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>' +
+  if (ftr) ftr.innerHTML = '<footer class="ftr"><div class="wrap"><span>' + esc(S.brand) + ' connects New Jersey homeowners with independent, licensed local pros. We don\'t perform the work.</span>' +
+    '<nav aria-label="Footer">' + liveTrades.map(function (t) { return '<a href="/' + S.trades[t].slug + '">' + esc(S.trades[t].name) + ' by county</a>'; }).join('') + '<a href="/help">Quick checks</a><a href="/contractors">For pros</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>' +
     '<span class="credit">ZIP code data from <a href="https://www.geonames.org/" rel="noopener">GeoNames</a>, CC BY 4.0.</span></div></footer>';
   document.querySelectorAll('[data-brand]').forEach(function (el) { el.textContent = S.brand; });
   if (document.title.indexOf(S.brand) < 0) document.title = document.title + ' | ' + S.brand;
 
-  // Booking bar and live coverage (home page, county pages, and guides).
+  // Booking card and live coverage (home page, county pages, and guides).
   var book = byId('book'), covEls = document.querySelectorAll('[data-cov]'), pros = document.querySelector('[data-county-pros]'), COV = null;
   var update = function () {};
+  var service = function () { var r = book && book.querySelector('input[name=s]:checked'); return r ? r.value : ''; };
+  var paint = function () {
+    if (!COV) return;
+    var grid = document.querySelector('.counties[data-trade]');
+    var t = book ? (S.services[service()] || {}).trade : grid ? grid.getAttribute('data-trade') : '', by = (t && COV.trades[t]) || COV.counties;
+    covEls.forEach(function (el) {
+      var c = el.getAttribute('data-cov'), dot = el.querySelector('.dot');
+      if (dot) dot.className = 'dot' + (by[c] !== 'none' ? ' ' + by[c] : '');
+      if (t && el.hasAttribute('data-follow')) el.setAttribute('href', '/' + S.trades[t].slug + '/' + slug(c));
+    });
+    document.querySelectorAll('[data-pin]').forEach(function (el) {
+      var mine = COV.trades[el.getAttribute('data-pin')] || {};
+      el.classList.toggle('on', Object.keys(mine).some(function (c) { return mine[c] === 'now'; }));
+    });
+  };
   if (book) {
-    var zip = book.elements.zip, county = book.elements.county, fixed = book.getAttribute('data-county') || '', covEl = byId('b-cov'), err = byId('b-err');
+    var zip = book.elements.zip, county = book.elements.county, sel = book.elements.p, fixed = book.getAttribute('data-county') || '', covEl = byId('b-cov'), err = byId('b-err');
     var lookup = function () { return window.NJ_ZIPS ? window.NJ_ZIPS[zip.value.trim()] : null; };
-    update = function () {
-      var z = zip.value.trim(), hit = lookup(), c = hit ? S.counties[hit[0]] : (z ? '' : fixed) || fixed;
-      county.value = hit ? c : fixed;
-      if (/^\d{5}$/.test(z) && !/^0[78]/.test(z)) { covEl.className = 'none'; covEl.textContent = "That's not a New Jersey ZIP code. We're only in NJ for now."; return; }
-      if (!c || !COV) { covEl.textContent = ''; return; }
-      var s = COV.counties[c], where = (hit ? hit[1] + ', ' : '') + c + ' County';
-      covEl.className = s;
-      covEl.textContent = s === 'now' ? where + ': contractors on call now.'
-        : s === 'later' ? where + ': contractors signed up, but none on call this hour. We\'ll show you who to call.'
-        : where + ': no contractor yet. You can still send a request.';
+    // Show only the problems that belong to the chosen service.
+    var problems = function (keep) {
+      var s = service();
+      sel.innerHTML = Object.keys(S.problems).filter(function (k) { return S.problems[k][2].indexOf(s) > -1; }).map(function (k) { return '<option value="' + k + '">' + esc(S.problems[k][0]) + '</option>'; }).join('');
+      if (keep && sel.querySelector('option[value="' + keep + '"]')) sel.value = keep;
     };
+    update = function () {
+      var z = zip.value.trim(), hit = lookup(), c = hit ? S.counties[hit[0]] : fixed;
+      county.value = c || '';
+      if (/^\d{5}$/.test(z) && !/^0[78]/.test(z)) { covEl.className = 'none'; covEl.textContent = "That's not a New Jersey ZIP code. We're only in NJ for now."; return; }
+      var t = S.trades[(S.services[service()] || {}).trade];
+      if (!c || !COV || !t) { covEl.textContent = ''; return; }
+      var s = COV.trades[(S.services[service()]).trade][c], where = (hit ? hit[1] + ', ' : '') + c + ' County';
+      covEl.className = s;
+      covEl.textContent = s === 'now' ? where + ': ' + t.pros + ' on call now.'
+        : s === 'later' ? where + ': ' + t.pros + ' signed up, but none on call this hour. We\'ll show you who to call.'
+        : where + ': no ' + t.pro + ' signed up yet. You can still send a request.';
+    };
+    // Start on the page's own service if it has one. Otherwise heating, or cooling from May through September.
+    var want = book.getAttribute('data-service') || '', keep = sel.value, month = new Date().getMonth();
+    if (!want && !book.hasAttribute('data-problem')) want = month >= 4 && month <= 8 ? 'cooling' : 'heating';
+    var radio = want && book.querySelector('input[name=s][value="' + want + '"]:not(:disabled)');
+    if (radio) radio.checked = true;
+    problems(book.hasAttribute('data-problem') ? keep : '');
+    book.addEventListener('change', function (e) { if (e.target.name === 's') { problems(); update(); paint(); } });
     zip.addEventListener('input', function () { err.hidden = true; update(); });
     book.addEventListener('submit', function (e) {
       var z = zip.value.trim(), msg = !/^\d{5}$/.test(z) ? 'Enter your 5-digit ZIP code.' : !/^0[78]/.test(z) ? "We're only in New Jersey for now. NJ ZIP codes start with 07 or 08." : '';
@@ -79,21 +113,18 @@
     });
   }
   if (book || covEls.length || pros) {
-    var where = pros ? pros.getAttribute('data-county-pros') : '';
-    window.api('/api/coverage' + (where ? '?county=' + encodeURIComponent(where) : '')).then(function (d) {
+    var where = pros ? pros.getAttribute('data-county-pros') : '', ptrade = pros ? pros.getAttribute('data-trade') || '' : '';
+    window.api('/api/coverage' + (where ? '?county=' + encodeURIComponent(where) + (ptrade ? '&trade=' + ptrade : '') : '')).then(function (d) {
       COV = d;
-      covEls.forEach(function (el) { var s = d.counties[el.getAttribute('data-cov')], dot = el.querySelector('.dot'); if (dot && s !== 'none') dot.classList.add(s); });
       var legend = byId('legend'); if (legend) legend.hidden = false;
-      var fee = byId('fee-line');
-      if (fee && d.visit_fee) fee.textContent = 'Contractors here charge $' + d.visit_fee.min + (d.visit_fee.max > d.visit_fee.min ? ' to $' + d.visit_fee.max : '') + ' to visit';
-      update();
+      paint(); update();
       if (pros) {
-        var list = d.contractors || [], s = d.counties[where];
+        var list = d.contractors || [], s = ((ptrade && d.trades[ptrade]) || d.counties)[where], T = S.trades[ptrade] || { pro: 'contractor', license: 'License' };
         pros.innerHTML = list.length
           ? '<p><span class="pill ' + (s === 'now' ? 'ok' : 'wait') + '">' + (s === 'now' ? 'On call now' : 'Off hours right now') + '</span></p>' +
-            list.map(function (c) { return '<div class="card"><b>' + esc(c.company) + '</b><span class="sub small">NJ HVACR license ' + esc(c.license) + '</span></div>'; }).join('') +
+            list.map(function (c) { return '<div class="card"><b>' + esc(c.company) + '</b><span class="sub small">' + esc(T.license) + ' ' + esc(c.license) + '</span></div>'; }).join('') +
             '<p class="small sub">Send a request and the ones who are free will answer with an arrival time and visit fee.</p>'
-          : '<div class="notice warn">No contractor has joined in ' + esc(where) + ' County yet. You can still send a request, and we\'ll tell you right away what we can do.</div>';
+          : '<div class="notice warn">No ' + esc(T.pro) + ' has joined in ' + esc(where) + ' County yet. You can still send a request, and we\'ll tell you right away what we can do.</div>';
       }
     }).catch(function () { if (pros) pros.innerHTML = '<p class="sub">We couldn\'t load the list just now. You can still send a request.</p>'; });
   }

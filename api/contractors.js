@@ -10,15 +10,17 @@ module.exports = wrap({
   async POST({ body }) {
     if (body.website) return { token: '' };
     const counties = Array.isArray(body.counties) ? body.counties.filter(c => C.counties.includes(c)) : [];
+    const trades = Array.isArray(body.trades) ? Object.keys(C.trades).filter(t => body.trades.includes(t)) : [];
     const c = {
       company: str(body.company, 120), contact: str(body.contact, 80), email: str(body.email, 120).toLowerCase(), mobile: str(body.mobile, 30),
-      license: str(body.license, 40).toUpperCase(), counties, alert_hours: C.alertHours[body.alert_hours] ? body.alert_hours : 'any', source: str(body.source, 120) || null
+      license: str(body.license, 120).toUpperCase(), counties, trades, alert_hours: C.alertHours[body.alert_hours] ? body.alert_hours : 'any', source: str(body.source, 120) || null
     };
     if (!c.company) throw bad('Enter your company name.');
     if (!c.contact) throw bad('Enter your name so we know who to call.');
     if (!isEmail(c.email)) throw bad('Enter a valid email address. Job alerts go there for now.');
     if (digits(c.mobile).length < 10) throw bad('Enter a 10-digit mobile number.');
-    if (c.license.length < 6) throw bad('Enter your NJ HVACR license number. We check it with the state board.');
+    if (!trades.length) throw bad('Pick the kind of work you do.');
+    if (c.license.length < 6) throw bad('Enter your New Jersey license number. We check it with the state before you get requests.');
     if (!counties.length) throw bad('Pick at least one county you serve.');
     // Step 2 fields are optional here (filled in on the settings page), but checked if sent.
     if (body.visit_fee != null && body.visit_fee !== '') {

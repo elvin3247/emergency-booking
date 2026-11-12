@@ -9,10 +9,10 @@
 <!-- seo:end -->
 <!-- head:start -->
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#FFC72C">
+<meta name="theme-color" content="#E9EDF1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
 <!-- head:end -->
 </head>
@@ -30,8 +30,8 @@ var tel = function (p) { return 'tel:' + String(p || '').replace(/[^\d+]/g, '');
 function render(msg) {
   var r = D.request, s = D.state, c = D.customer, h = '';
   if (fee == null) fee = D.mine.visit_fee;
-  h += '<div><p class="eyebrow">' + esc(r.county) + ' County · ZIP ' + esc(r.zip) + '</p><h1>' + esc(SITE.problems[r.problem][0]) + '</h1>' +
-    '<p class="sub">' + esc(r.timing) + ' · ' + esc(r.system) + '</p></div>';
+  h += '<div class="stack"><p class="eyebrow">' + esc(r.county) + ' County · ZIP ' + esc(r.zip) + '</p><h1>' + esc(SITE.problems[r.problem][0]) + '</h1>' +
+    '<p class="sub">' + [(SITE.services[r.service] || {}).name, r.timing, r.system].filter(Boolean).map(esc).join(' · ') + '</p></div>';
   if (r.note) h += '<div class="card"><b>Customer\'s note</b><p>' + esc(r.note) + '</p></div>';
 
   if (s === 'open' || s === 'declined') {

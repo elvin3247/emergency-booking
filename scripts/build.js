@@ -19,11 +19,29 @@ const crumbsLd = items => ({ '@context': 'https://schema.org', '@type': 'Breadcr
 const sitemap = [];
 
 const HEAD = `<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#FFC72C">
+<meta name="theme-color" content="#E9EDF1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">`;
+
+// Services and trades that are switched on in config.js.
+const SERVICES = Object.keys(C.services);
+const LIVE = SERVICES.filter(k => C.services[k].live);
+const LIVE_TRADES = Object.keys(C.trades).filter(t => LIVE.some(k => C.services[k].trade === t));
+const servicesOf = trade => SERVICES.filter(k => C.services[k].trade === trade);
+const problemsOf = service => Object.keys(C.problems).filter(k => C.problems[k][2].includes(service));
+const icon = k => '<span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + C.icons[k] + '</svg></span>';
+const list = arr => (arr.length < 3 ? arr.join(' and ') : arr.slice(0, -1).join(', ') + ', and ' + arr[arr.length - 1]);
+const LIVE_NAMES = list(LIVE.map(k => C.services[k].name.toLowerCase()));
+// Search wording for each trade's county pages.
+const COPY = {
+  hvac: { what: 'HVAC repair', h1: 'Emergency HVAC repair', ask: 'No heat or no cooling?', who: 'HVAC company' },
+  plumbing: { what: 'plumber', h1: 'Emergency plumber', ask: 'Burst pipe, backed-up drain, or no hot water?', who: 'plumbing company' },
+  electrical: { what: 'electrician', h1: 'Emergency electrician', ask: 'Lost power in part of the house, or a breaker that keeps tripping?', who: 'electrical company' },
+  appliance: { what: 'appliance repair', h1: 'Emergency appliance repair', ask: 'Fridge, washer, dryer, or oven quit?', who: 'appliance repair company' }
+};
+const cap = s => s.replace(/\b[a-z]/g, c => c.toUpperCase());
 
 function seo(m) {
   const title = m.title + ' | ' + C.brand;
@@ -70,67 +88,90 @@ ${opts.sticky ? '<div class="sticky-cta"><a class="btn" href="#book">Get help no
 `;
 }
 
-// The booking bar. A plain GET form, so it works even before the scripts load.
+// The booking card: service chips, the problem, and a ZIP code. A plain GET form, so it works even before the scripts load.
 function bookBar(o) {
   o = o || {};
-  const opt = (v, t, sel) => '<option value="' + esc(v) + '"' + (sel ? ' selected' : '') + '>' + esc(t || v) + '</option>';
-  return `<form class="book" id="book" action="/request" method="get"${o.county ? ' data-county="' + esc(o.county) + '"' : ''}>
-        <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p">${Object.keys(C.problems).map(k => opt(k, C.problems[k][0], k === o.problem)).join('')}</select></div>
-        <div><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="07059" required></div>
-        <div><label for="b-timing">How soon</label><select id="b-timing" name="timing">${C.timings.map(t => opt(t)).join('')}</select></div>
-        <input type="hidden" name="county" value="${esc(o.county || '')}">
-        <button class="btn" type="submit">Find who can come</button>
+  const first = o.service || LIVE[0];
+  const chips = SERVICES.map(k => {
+    const s = C.services[k];
+    return '<label class="chip" for="b-s-' + k + '"><input type="radio" id="b-s-' + k + '" name="s" value="' + k + '"' + (s.live ? (k === first ? ' checked' : '') : ' disabled') + '><span>' + esc(s.name) + (s.live ? '' : '<em>Soon</em>') + '</span></label>';
+  }).join('\n          ');
+  const groups = LIVE.map(k => '<optgroup label="' + esc(C.services[k].name) + '">' + problemsOf(k).map(p => '<option value="' + p + '"' + (p === o.problem && k === first ? ' selected' : '') + '>' + esc(C.problems[p][0]) + '</option>').join('') + '</optgroup>').join('');
+  return `<form class="book" id="book" action="/request" method="get"${o.county ? ' data-county="' + esc(o.county) + '"' : ''}${o.service ? ' data-service="' + o.service + '"' : ''}${o.problem ? ' data-problem' : ''}>
+        <fieldset class="svc"><legend>What kind of help do you need?</legend>
+          ${chips}
+        </fieldset>
+        <div class="bar">
+          <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p">${groups}</select></div>
+          <div class="z"><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="07059" required></div>
+          <input type="hidden" name="county" value="${esc(o.county || '')}">
+          <button class="btn" type="submit">Find who can come</button>
+        </div>
         <p class="err" id="b-err" role="alert" hidden></p>
-        <p class="foot"><b id="b-cov" role="status"></b> Smell gas or hear a CO alarm? Leave the house and call 911 or your gas utility first.</p>
+        <p class="foot"><b id="b-cov" role="status"></b>Free for homeowners. Smell gas, see sparks, or hear a CO alarm? Leave the house and call 911 first.</p>
       </form>`;
 }
 
-const problemRows = county => Object.keys(C.problems).map(k => {
-  const p = C.problems[k], q = '/request?p=' + k + (county ? '&amp;county=' + encodeURIComponent(county) : '');
-  return '<div class="r"><a class="main" href="' + q + '"><b>' + esc(p[0]) + '</b><span>' + esc(p[1]) + '</span></a>' + (GUIDES[k] ? '<a class="quick" href="/help/' + k + '">Quick checks</a>' : '') + '<a class="arrow" href="' + q + '" aria-label="Request help: ' + esc(p[0]) + '">&rarr;</a></div>';
-}).join('\n        ') + '\n        <div class="r soon"><span class="main"><b>Plumbing, electrical</b><span>Coming later</span></span></div>';
+// The service cards on the home page.
+const serviceGrid = () => SERVICES.map(k => {
+  const s = C.services[k], body = icon(k) + '<span><b>' + esc(s.name) + (s.live ? '' : '<span class="pill plain">Coming soon</span>') + '</b><span>' + esc(s.blurb) + '</span></span>';
+  return s.live ? '<a class="svccard t-' + k + '" href="/request?s=' + k + '">' + body + '</a>' : '<div class="svccard off t-' + k + '">' + body + '</div>';
+}).join('\n        ');
 
-const countyGrid = () => C.counties.map(c => '<a href="/hvac/' + slug(c) + '" data-cov="' + esc(c) + '"><i class="dot"></i>' + esc(c) + '</a>').join('\n        ');
+const problemRows = (trade, county) => servicesOf(trade).filter(k => C.services[k].live).map(k => problemsOf(k).filter(p => p !== 'other' && C.problems[p][2][0] === k).map(p => {
+  const P = C.problems[p], q = '/request?s=' + k + '&amp;p=' + p + (county ? '&amp;county=' + encodeURIComponent(county) : '');
+  return '<div class="r"><a class="main" href="' + q + '"><b>' + esc(P[0]) + '</b><span>' + esc(P[1]) + '</span></a>' + (GUIDES[p] ? '<a class="quick" href="/help/' + p + '">Quick checks</a>' : '') + '<a class="arrow" href="' + q + '" aria-label="Request help: ' + esc(P[0]) + '">&rarr;</a></div>';
+}).join('\n        ')).join('\n        ');
+
+const countyGrid = (trade, follow) => C.counties.map(c => '<a href="/' + C.trades[trade].slug + '/' + slug(c) + '" data-cov="' + esc(c) + '"' + (follow ? ' data-follow' : '') + '><i class="dot"></i>' + esc(c) + '</a>').join('\n        ');
 const HOW = `<ol class="how">
-        <li><span class="n">1</span><b>Tell us the problem</b><span>What's wrong, your ZIP, and how soon. About a minute.</span></li>
-        <li><span class="n">2</span><b>Contractors say yes</b><span>Each one who's free sends an arrival time and visit fee.</span></li>
-        <li><span class="n">3</span><b>You choose</b><span>Compare up to ${C.maxOffers}. Only the one you pick gets your name, number, and address.</span></li>
+        <li><span class="n">1</span><b>Pick the service and your ZIP</b><span>Tell us what's wrong. It takes about a minute.</span></li>
+        <li><span class="n">2</span><b>Nearby pros say yes</b><span>Each one who's free sends an arrival time and visit fee.</span></li>
+        <li><span class="n">3</span><b>You choose one</b><span>Compare up to ${C.maxOffers}. Only the one you pick gets your name, number, and address.</span></li>
       </ol>`;
+const LEGEND = '<div class="legend" id="legend" hidden><span><i class="dot now"></i>On call now</span><span><i class="dot later"></i>Signed up, off hours now</span><span><i class="dot"></i>Recruiting, you can still ask</span></div>';
 
-// ---- County pages: /hvac/<county>-county-nj ----
+// ---- County pages for each trade that is switched on: /hvac/<county>-county-nj, /plumbing/<county>-county-nj ----
 const towns = {};
 Object.keys(ZIPS).sort().forEach(z => { const c = C.counties[ZIPS[z][0]], p = ZIPS[z][1]; (towns[c] = towns[c] || {}); (towns[c][p] = towns[c][p] || []).push(z); });
 
-C.counties.forEach(county => {
-  const p = '/hvac/' + slug(county), list = towns[county] || {}, names = Object.keys(list).sort();
-  const m = {
-    path: p,
-    title: 'Emergency HVAC Repair in ' + county + ' County, NJ: See Who Can Come',
-    desc: 'No heat or no AC in ' + county + ' County? Licensed New Jersey HVAC contractors who are free reply with an arrival time and visit fee. Free for homeowners, open 24/7.',
-    ld: [
-      { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency HVAC repair', name: 'Emergency HVAC repair in ' + county + ' County, NJ', provider: org(), areaServed: { '@type': 'AdministrativeArea', name: county + ' County, New Jersey' } },
-      crumbsLd([['Home', '/'], ['Service areas', '/hvac'], [county + ' County']])
-    ]
-  };
-  write('hvac/' + slug(county) + '.html', shell(m, `  <section class="hero sm">
+// Remove pages for trades that have been switched off since the last build.
+Object.keys(C.trades).forEach(t => { if (!LIVE_TRADES.includes(t)) { fs.rmSync(path.join(PUB, C.trades[t].slug), { recursive: true, force: true }); fs.rmSync(path.join(PUB, C.trades[t].slug + '.html'), { force: true }); } });
+
+LIVE_TRADES.forEach(trade => {
+  const T = C.trades[trade], K = COPY[trade], root = '/' + T.slug, first = servicesOf(trade).find(k => C.services[k].live);
+  C.counties.forEach(county => {
+    const p = root + '/' + slug(county), mine = towns[county] || {}, names = Object.keys(mine).sort();
+    const also = LIVE_TRADES.filter(t => t !== trade).map(t => '<a href="/' + C.trades[t].slug + '/' + slug(county) + '">' + esc(C.trades[t].name) + '</a>').join('');
+    const m = {
+      path: p,
+      title: cap(K.h1) + ' in ' + county + ' County, NJ: See Who Can Come',
+      desc: K.ask + ' Licensed ' + T.pros + ' who cover ' + county + ' County and are free reply with an arrival time and visit fee. Free for homeowners, open 24/7.',
+      ld: [
+        { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency ' + K.what, name: K.h1 + ' in ' + county + ' County, NJ', provider: org(), areaServed: { '@type': 'AdministrativeArea', name: county + ' County, New Jersey' } },
+        crumbsLd([['Home', '/'], [T.name, root], [county + ' County']])
+      ]
+    };
+    write(T.slug + '/' + slug(county) + '.html', shell(m, `  <section class="hero sm">
     <div class="wrap">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/hvac">Service areas</a> / ${esc(county)} County</nav>
-      <h1>Emergency HVAC repair in ${esc(county)} County, NJ</h1>
-      <p class="lede">No heat or no cooling? Tell us what's wrong. Licensed contractors who cover ${esc(county)} County and are free reply with an arrival time and visit fee. You pick one.</p>
-      ${bookBar({ county })}
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${root}">${esc(T.name)}</a> / ${esc(county)} County</nav>
+      <h1>${esc(K.h1)} in ${esc(county)} County, NJ</h1>
+      <p class="lede">${esc(K.ask)} Tell us what's wrong. Licensed ${esc(T.pros)} who cover ${esc(county)} County and are free reply with an arrival time and visit fee. You pick one.</p>
+      ${bookBar({ county, service: first })}
     </div>
   </section>
   <section class="sec">
     <div class="wrap two">
       <div class="stack">
-        <h2>Contractors in ${esc(county)} County</h2>
-        <div class="stack" data-county-pros="${esc(county)}"><p class="sub">Checking who's signed up...</p></div>
-        <p class="sub">Run an HVAC company in ${esc(county)} County? <a href="/contractors">Apply to get emergency requests here.</a></p>
+        <h2>${esc(cap(T.pros))} in ${esc(county)} County</h2>
+        <div class="stack" data-county-pros="${esc(county)}" data-trade="${trade}"><p class="sub">Checking who's signed up...</p></div>
+        <p class="sub">Run ${/^[aeiou]/i.test(K.who) ? 'an' : 'a'} ${esc(K.who)} in ${esc(county)} County? <a href="/contractors">Apply to get emergency requests here.</a></p>
+        ${also ? '<p class="also"><span class="sub">Also in ' + esc(county) + ' County:</span>' + also + '</p>' : ''}
       </div>
       <div class="stack">
         <h2>Towns we cover</h2>
         <p class="sub">Every ${esc(county)} County ZIP code can send a request.</p>
-        <ul class="towns">${names.map(n => '<li>' + esc(n) + ' <span>' + list[n].join(', ') + '</span></li>').join('')}</ul>
+        <ul class="towns">${names.map(n => '<li>' + esc(n) + ' <span>' + mine[n].join(', ') + '</span></li>').join('')}</ul>
       </div>
     </div>
   </section>
@@ -138,7 +179,7 @@ C.counties.forEach(county => {
     <div class="wrap">
       <h2>What's wrong?</h2>
       <div class="rows">
-        ${problemRows(county)}
+        ${problemRows(trade, county)}
       </div>
     </div>
   </section>
@@ -146,38 +187,41 @@ C.counties.forEach(county => {
     <div class="wrap">
       <h2>How it works</h2>
       ${HOW}
-      <p class="sub" style="margin-top:20px">No one free within ${C.windowMin} minutes? We say so and show contractors you can call directly.</p>
+      <p class="sub" style="margin-top:20px">No one free within ${C.windowMin} minutes? We say so and show ${esc(T.pros)} you can call directly.</p>
     </div>
-  </section>`, { bodyClass: 'home', sticky: true }));
-});
+  </section>`, { bodyClass: 'inner', sticky: true }));
+  });
 
-// ---- Service areas index: /hvac ----
-write('hvac.html', shell({
-  path: '/hvac', title: 'Emergency HVAC Repair by County in New Jersey',
-  desc: 'See where licensed HVAC contractors are taking emergency requests right now, in all 21 New Jersey counties.',
-  ld: [crumbsLd([['Home', '/'], ['Service areas']])]
-}, `  <section class="hero sm">
+  // The trade's index: /hvac, /plumbing
+  write(T.slug + '.html', shell({
+    path: root, title: cap(K.h1) + ' by County in New Jersey',
+    desc: 'See where licensed ' + T.pros + ' are taking emergency requests right now, in all 21 New Jersey counties.',
+    ld: [crumbsLd([['Home', '/'], [T.name]])]
+  }, `  <section class="hero sm">
     <div class="wrap">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / Service areas</nav>
-      <h1>Emergency HVAC repair across New Jersey</h1>
-      <p class="lede">We're adding licensed contractors county by county. This page shows who's on call right now.</p>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / ${esc(T.name)}</nav>
+      <h1>${esc(K.h1)} across New Jersey</h1>
+      <p class="lede">We're adding licensed ${esc(T.pros)} county by county. This page shows where they're on call right now.</p>
     </div>
   </section>
   <section class="sec">
     <div class="wrap">
-      <div class="legend" id="legend" hidden><span><i class="dot now"></i>On call now</span><span><i class="dot later"></i>Signed up, off hours now</span><span><i class="dot"></i>Recruiting, you can still ask</span></div>
-      <div class="counties">
-        ${countyGrid()}
+      ${LEGEND}
+      <div class="counties" data-trade="${trade}">
+        ${countyGrid(trade)}
       </div>
-      <p class="sub" style="margin-top:20px">Don't see your county lit up? <a href="/request">Send a request anyway</a> and we'll tell you right away what we can do.</p>
+      <p class="sub" style="margin-top:20px">Don't see your county lit up? <a href="/request?s=${first}">Send a request anyway</a> and we'll tell you right away what we can do.</p>
     </div>
   </section>`));
+});
 
 // ---- Troubleshooting guides: /help/<problem> ----
 const li = arr => arr.map(x => '<li>' + esc(x) + '</li>').join('');
-Object.keys(GUIDES).forEach(k => {
+const GKEYS = Object.keys(GUIDES).filter(k => C.problems[k] && C.services[C.problems[k][2][0]].live);
+Object.keys(GUIDES).filter(k => !GKEYS.includes(k)).forEach(k => fs.rmSync(path.join(PUB, 'help', k + '.html'), { force: true }));
+GKEYS.forEach(k => {
   const g = GUIDES[k], p = '/help/' + k;
-  const others = Object.keys(GUIDES).filter(x => x !== k).map(x => '<a href="/help/' + x + '">' + esc(C.problems[x][0]) + '</a>').join(' · ');
+  const others = GKEYS.filter(x => x !== k).map(x => '<a href="/help/' + x + '">' + esc(C.problems[x][0]) + '</a>').join('');
   write('help/' + k + '.html', shell({
     path: p, title: g.title.replace(/\b[a-z]/g, (c, i) => (i === 0 ? c.toUpperCase() : c)), desc: g.desc,
     ld: [
@@ -193,7 +237,7 @@ Object.keys(GUIDES).forEach(k => {
   </section>
   <section class="sec">
     <div class="wrap guide">
-      <div class="notice crit"><b>Smell gas, or is a carbon monoxide alarm sounding?</b> Skip this page. Leave the house, then call 911 or your gas utility's emergency line from outside.</div>
+      <div class="notice crit"><b>${esc(g.danger || 'Smell gas, or is a carbon monoxide alarm sounding?')}</b> Skip this page. Leave the house, then call 911${g.danger ? '' : " or your gas utility's emergency line"} from outside.</div>
       <ol class="checks">
         ${g.checks.map(c => '<li><b>' + esc(c[0]) + '</b><p>' + esc(c[1]) + '</p></li>').join('\n        ')}
       </ol>
@@ -201,22 +245,22 @@ Object.keys(GUIDES).forEach(k => {
         <div class="card"><h3>Stop and call a pro if</h3><ul class="plain">${li(g.stop)}</ul></div>
         <div class="card"><h3>While you wait</h3><ul class="plain">${li(g.meanwhile)}</ul></div>
       </div>
-      <p class="small sub">These are general checks, not a diagnosis. If anything seems unsafe, stop and call a licensed contractor.</p>
+      <p class="small sub">These are general checks, not a diagnosis. If anything seems unsafe, stop and call a licensed professional.</p>
     </div>
   </section>
   <section class="sec">
     <div class="wrap">
       <h2>Still not working? See who can come.</h2>
-      <p class="lede" style="margin-bottom:8px">Licensed New Jersey contractors who are free reply with an arrival time and visit fee. Free for homeowners.</p>
-      ${bookBar({ problem: k }).replace('class="book"', 'class="book solo"')}
-      <p class="sub" style="margin-top:24px">Other quick checks: ${others}</p>
+      <p class="lede" style="margin-bottom:16px">Licensed New Jersey pros who are free reply with an arrival time and visit fee. Free for homeowners.</p>
+      ${bookBar({ problem: k, service: C.problems[k][2][0] }).replace('class="book"', 'class="book solo"')}
+      <p class="also" style="margin-top:24px"><span class="sub">Other quick checks:</span>${others}</p>
     </div>
-  </section>`, { bodyClass: 'home', sticky: true }));
+  </section>`, { bodyClass: 'inner', sticky: true }));
 });
 
 write('help.html', shell({
-  path: '/help', title: 'HVAC Quick Checks: What to Try Before You Call',
-  desc: 'Safe, tool-free checks for no heat, no cooling, leaks, strange noises, and dead thermostats, plus when to stop and call a licensed contractor.',
+  path: '/help', title: 'Home Repair Quick Checks: What to Try Before You Call',
+  desc: 'Safe, tool-free checks for no heat, no cooling, leaks, clogs, no hot water, and more, plus when to stop and call a licensed pro.',
   ld: [crumbsLd([['Home', '/'], ['Quick checks']])]
 }, `  <section class="hero sm">
     <div class="wrap">
@@ -228,16 +272,16 @@ write('help.html', shell({
   <section class="sec">
     <div class="wrap">
       <div class="rows">
-        ${Object.keys(GUIDES).map(k => '<div class="r"><a class="main" href="/help/' + k + '"><b>' + esc(C.problems[k][0]) + '</b><span>' + esc(GUIDES[k].checks.length + ' checks · ' + C.problems[k][1]) + '</span></a><a class="arrow" href="/help/' + k + '" aria-label="' + esc(C.problems[k][0]) + ' checks">&rarr;</a></div>').join('\n        ')}
+        ${GKEYS.map(k => '<div class="r"><a class="main" href="/help/' + k + '"><b>' + esc(C.problems[k][0]) + '</b><span>' + esc(GUIDES[k].checks.length + ' checks · ' + C.problems[k][1]) + '</span></a><a class="arrow" href="/help/' + k + '" aria-label="' + esc(C.problems[k][0]) + ' checks">&rarr;</a></div>').join('\n        ')}
       </div>
     </div>
   </section>`));
 
 // ---- Hand-written pages: stamp the shared head, brand, and home page blocks ----
 const PAGES = {
-  'index.html': { path: '/', title: 'Emergency HVAC Repair in New Jersey, 24/7: See Who Can Come', desc: 'No heat or no AC? Tell us what\'s wrong and licensed New Jersey HVAC contractors who are free reply with an arrival time and visit fee. You choose. Free for homeowners.' },
-  'contractors.html': { path: '/contractors', title: 'Emergency HVAC Leads in New Jersey: Pay Only When Chosen', desc: 'Get emergency HVAC requests in the New Jersey counties and hours you choose. First ' + C.freeLeads + ' chosen leads free, then $' + C.leadFee + ' only when a customer picks you. No monthly fee.' },
-  'request.html': { path: '/request', title: 'Request Emergency HVAC Help in New Jersey', desc: 'Tell us what\'s wrong and we\'ll alert licensed New Jersey HVAC contractors who can come. Takes about a minute.' },
+  'index.html': { path: '/', title: 'Emergency Home Repair in New Jersey, 24/7: See Who Can Come Now', desc: 'Home emergency? Pick ' + LIVE_NAMES + ', and licensed New Jersey pros who are free reply with an arrival time and visit fee. You choose. Free for homeowners.' },
+  'contractors.html': { path: '/contractors', title: 'Emergency Repair Leads in New Jersey: Pay Only When Chosen', desc: 'HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. First ' + C.freeLeads + ' chosen leads free, then $' + C.leadFee + ' only when a customer picks you. No monthly fee.' },
+  'request.html': { path: '/request', title: 'Request Emergency Home Repair in New Jersey', desc: 'Tell us what\'s wrong and we\'ll alert licensed New Jersey pros who can come. Takes about a minute.' },
   'status.html': { title: 'Your request', noindex: true },
   'respond.html': { title: 'Job request', noindex: true },
   'terms.html': { title: 'Terms', noindex: true },
@@ -256,14 +300,18 @@ Object.keys(PAGES).forEach(file => {
   const m = PAGES[file];
   if (file === 'index.html') {
     html = block(html, 'book', '      ' + bookBar());
-    html = block(html, 'rows', '        ' + problemRows());
-    html = block(html, 'counties', '        ' + countyGrid());
+    html = block(html, 'services', '        ' + serviceGrid());
+    html = block(html, 'counties', '        ' + countyGrid(LIVE_TRADES[0], true));
     html = block(html, 'how', '      ' + HOW);
+    const soon = SERVICES.filter(k => !C.services[k].live).map(k => C.services[k].name.toLowerCase());
+    const up = t => t.charAt(0).toUpperCase() + t.slice(1);
+    html = html.replace(/(<span id="hero-services">)[^<]*/, '$1' + esc(up(LIVE_NAMES)) + ' repair.');
+    html = html.replace(/(<p id="faq-services">)[^<]*/, '$1' + esc(up(LIVE_NAMES)) + ' repair today.' + (soon.length ? ' ' + esc(up(list(soon))) + ' ' + (soon.length > 1 ? 'are' : 'is') + ' coming as licensed pros sign up.' : ''));
     const faq = [];
     html.replace(/<details><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g, (_, q, a) => { faq.push({ '@type': 'Question', name: q.replace(/<[^>]+>/g, '').trim(), acceptedAnswer: { '@type': 'Answer', text: a.replace(/<[^>]+>/g, '').trim() } }); });
     m.ld = [
       Object.assign({ '@context': 'https://schema.org' }, org()),
-      { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency HVAC repair', name: 'Emergency heating and cooling repair', provider: org(), areaServed: { '@type': 'State', name: 'New Jersey' }, hoursAvailable: { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], opens: '00:00', closes: '23:59' } },
+      { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency home repair', name: 'Emergency ' + LIVE_NAMES + ' repair', provider: org(), areaServed: { '@type': 'State', name: 'New Jersey' }, hoursAvailable: { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], opens: '00:00', closes: '23:59' } },
       { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq }
     ];
   }

@@ -9,10 +9,10 @@
 <!-- seo:end -->
 <!-- head:start -->
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#FFC72C">
+<meta name="theme-color" content="#E9EDF1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
 <!-- head:end -->
 </head>
@@ -27,7 +27,9 @@ var app = document.getElementById('app'), token = new URLSearchParams(location.s
 var D = null, skew = 0, confirming = null, busy = false, poll;
 var steps = function (n) { return '<ol class="steps">' + ['Problem', 'Details', 'Who can come', 'Connected'].map(function (s, i) { return '<li class="' + (i <= n ? 'on' : '') + '">' + (i + 1) + '. ' + s + '</li>'; }).join('') + '</ol>'; };
 var left = function () { return (D.window_ends - (Date.now() + skew)) / 1000; };
-var summary = function () { var r = D.request; return SITE.problems[r.problem][0] + ' · ' + esc(r.zip) + ' · ' + esc(r.timing); };
+var svc = function () { return SITE.services[D.request.service] || { name: '', trade: 'hvac' }; };
+var T = function () { return SITE.trades[svc().trade]; };
+var summary = function () { var r = D.request; return (svc().name ? esc(svc().name) + ': ' : '') + SITE.problems[r.problem][0] + ' · ' + esc(r.zip) + ' · ' + esc(r.timing); };
 var backup = function () {
   if (!D.backup || !D.backup.length) return '';
   return '<div class="card"><h3>Contractors you can call directly</h3><p class="small sub">Licensed and signed up in ' + esc(D.request.county) + ' County, but not confirmed available right now.</p>' +
@@ -51,12 +53,12 @@ function render() {
         var pick = confirming === o.id
           ? '<p class="small">This shares your name, phone, email, and address with ' + esc(o.company) + '.</p><div class="btns"><button class="btn" type="button" data-confirm="' + o.id + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Connecting...' : 'Yes, connect us') + '</button><button class="btn ghost" type="button" data-cancel>Not yet</button></div>'
           : '<div><button class="btn" type="button" data-choose="' + o.id + '">Choose ' + esc(o.company) + '</button></div>';
-        return '<div class="card"><div><h3>' + esc(o.company) + '</h3><div class="small sub">NJ HVACR license ' + esc(o.license) + '</div></div>' +
+        return '<div class="card"><div><h3>' + esc(o.company) + '</h3><div class="small sub">' + esc(T().license) + ' ' + esc(o.license) + '</div></div>' +
           '<dl class="facts"><div><dt>Arrives</dt><dd>' + esc(o.arrival) + '</dd></div><div><dt>Visit fee</dt><dd>$' + esc(o.visit_fee) + '</dd></div><div><dt>Said yes in</dt><dd>' + (o.secs < 3600 ? mmss(o.secs) : Math.round(o.secs / 3600) + ' hr') + '</dd></div></dl>' + pick + '</div>';
       }).join('') +
       '<p class="err" id="err" role="alert" hidden></p><p class="small sub">The visit fee covers the trip and diagnosis and is paid to the contractor. Repairs are quoted on site.</p>';
   } else if (!D.alerted) {
-    h = '<div><h1>No contractor near you yet</h1><p class="sub">We don\'t have a contractor signed up for ' + esc(D.request.county) + ' County at this hour. We won\'t pretend otherwise.</p></div>' + steps(2) +
+    h = '<div><h1>No ' + esc(T().pro) + ' near you yet</h1><p class="sub">We don\'t have ' + (/^[aeiou]/i.test(T().pro) ? 'an ' : 'a ') + esc(T().pro) + ' signed up for ' + esc(D.request.county) + ' County at this hour. We won\'t pretend otherwise.</p></div>' + steps(2) +
       '<div class="notice warn">Our team has your request and has been told about the gap. If a contractor becomes available, we\'ll email you.</div>' + backup() +
       '<p class="small sub">' + summary() + '</p>';
   } else if (left() > 0) {

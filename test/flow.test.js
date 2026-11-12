@@ -8,7 +8,7 @@ const store = require('../lib/store');
 const base = 'http://localhost:3999';
 const call = async (p, body) => { const r = await fetch(base + p, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}); return { status: r.status, data: await r.json() }; };
 const linkTo = to => { const m = mail.outbox.filter(x => x.to === to && /respond\?t=/.test(x.html)).pop(); return m.html.match(/respond\?t=([\w-]+)/)[1]; };
-const contractor = (n, counties) => ({ company: 'Test Co ' + n, contact: 'Pat', email: 'c' + n + '@example.com', mobile: '908-555-010' + n, business_phone: '908-555-020' + n, license: '19HC0000000' + n, counties, visit_fee: 80 + n, alert_hours: 'any', consent: true });
+const contractor = (n, counties) => ({ company: 'Test Co ' + n, contact: 'Pat', email: 'c' + n + '@example.com', mobile: '908-555-010' + n, business_phone: '908-555-020' + n, license: '19HC0000000' + n, counties, trades: ['hvac'], visit_fee: 80 + n, alert_hours: 'any', consent: true });
 const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', county: 'Somerset', timing: 'As soon as possible', system: 'Gas furnace', note: '', name: 'Sam Homeowner', phone: '908-555-0100', email: 'home@example.com', address: '12 Sample Lane', consent: true }, extra);
 
 (async () => {
@@ -87,14 +87,14 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     assert.deepStrictEqual(cov.visit_fee, { min: 81, max: 85 });
     assert.strictEqual(cov.contractors, undefined);
     const som = (await call('/api/coverage?county=Somerset')).data;
-    assert.strictEqual(som.contractors.length, 4); assert.deepStrictEqual(Object.keys(som.contractors[0]).sort(), ['company', 'license'], 'county list shows name and license only');
+    assert.strictEqual(som.contractors.length, 4); assert.deepStrictEqual(Object.keys(som.contractors[0]).sort(), ['company', 'license', 'trades'], 'county list shows name, license, and trades only');
 
     // Visitor source is saved with the request
     r = await call('/api/requests', request({ source: 'ref:agent-smith' }));
     assert.strictEqual(store._tables.requests.find(x => x.token === r.data.token).source, 'ref:agent-smith');
     assert.ok(mail.outbox.some(m => m.to === 'admin@example.com' && /ref:agent-smith/.test(m.html)), 'admin email shows the source');
     // Two-step sign-up: no requests until setup is finished; pause and resume
-    const signup = await call('/api/contractors', { company: 'Step Co', contact: 'Lee', email: 'step@example.com', mobile: '908-555-0177', license: '19HC00009999', counties: ['Somerset'], consent: true });
+    const signup = await call('/api/contractors', { company: 'Step Co', contact: 'Lee', email: 'step@example.com', mobile: '908-555-0177', license: '19HC00009999', counties: ['Somerset'], trades: ['hvac'], consent: true });
     assert.strictEqual(signup.status, 200); const mt = signup.data.token; assert.ok(mt);
     let pro = (await call('/api/pro?t=' + mt)).data;
     assert.strictEqual(pro.setup_complete, false);
@@ -120,6 +120,26 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     assert.strictEqual(pro.paused_until, null);
     assert.strictEqual(await alertedNow(), base + 1);
     assert.strictEqual((await call('/api/pro?t=nope')).status, 404);
+
+    // More than heating and cooling: requests go only to the matching trade
+    assert.strictEqual((await call('/api/contractors', Object.assign(contractor(7, ['Somerset']), { trades: [] }))).status, 400, 'a trade is required');
+    await call('/api/contractors', Object.assign(contractor(8, ['Somerset']), { trades: ['plumbing'] }));
+    await call('/api/contractors', Object.assign(contractor(9, ['Somerset']), { trades: ['hvac', 'plumbing'] }));
+    const before = mail.outbox.length;
+    r = await call('/api/requests', request({ service: 'water-heater', problem: 'no-hot-water' }));
+    assert.strictEqual(r.status, 200);
+    s = (await call('/api/requests?token=' + r.data.token)).data;
+    assert.strictEqual(s.alerted, 2, 'only plumbers are alerted for a water heater'); assert.strictEqual(s.request.service, 'water-heater');
+    const sent = mail.outbox.slice(before).filter(m => /respond\?t=/.test(m.html)).map(m => m.to).sort();
+    assert.deepStrictEqual(sent, ['c8@example.com', 'c9@example.com']);
+    assert.strictEqual(store._tables.requests.find(x => x.token === r.data.token).system, null, 'no HVAC system on a plumbing request');
+    assert.strictEqual((await call('/api/requests', request({ service: 'plumbing', problem: 'no-heat' }))).status, 400, 'problem must belong to the service');
+    assert.strictEqual((await call('/api/requests', request({ service: 'electrical', problem: 'breaker' }))).status, 400, 'services that are not switched on are refused');
+    const cov2 = (await call('/api/coverage?county=Somerset&trade=plumbing')).data;
+    assert.strictEqual(cov2.trades.plumbing.Somerset, 'now'); assert.strictEqual(cov2.trades.plumbing.Bergen, 'none'); assert.strictEqual(cov2.trades.electrical.Somerset, 'none');
+    assert.strictEqual(cov2.contractors.length, 2, 'county list can be narrowed to one trade');
+    pro = (await call('/api/pro', { t: mt, action: 'settings', visit_fee: 99, business_phone: '908-555-0188', trades: ['hvac', 'electrical'] })).data;
+    assert.deepStrictEqual(pro.trades, ['hvac', 'electrical']);
 
     console.log('All booking flow checks passed.');
   } finally { server.close(); }

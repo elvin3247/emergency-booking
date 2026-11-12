@@ -10,7 +10,7 @@ async function load(t) {
   return c;
 }
 const view = c => ({
-  company: c.company, contact: c.contact, email: c.email, status: c.status, counties: c.counties,
+  company: c.company, contact: c.contact, email: c.email, status: c.status, counties: c.counties, trades: c.trades || ['hvac'],
   visit_fee: c.visit_fee, business_phone: c.business_phone, alert_hours: c.alert_hours,
   paused_until: isPaused(c) ? c.paused_until : null, in_hours: withinHours(c.alert_hours),
   free_leads_left: c.free_leads_left, setup_complete: isReady(c)
@@ -38,6 +38,11 @@ module.exports = wrap({
         const counties = body.counties.filter(x => C.counties.includes(x));
         if (!counties.length) throw bad('Pick at least one county you serve.');
         p.counties = counties;
+      }
+      if (Array.isArray(body.trades)) {
+        const trades = Object.keys(C.trades).filter(x => body.trades.includes(x));
+        if (!trades.length) throw bad('Pick the kind of work you do.');
+        p.trades = trades;
       }
       return view(await store.updateContractor(c.id, p));
     }

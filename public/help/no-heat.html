@@ -16,14 +16,14 @@
 <!-- seo:end -->
 <!-- head:start -->
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#FFC72C">
+<meta name="theme-color" content="#E9EDF1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
 <!-- head:end -->
 </head>
-<body class="home">
+<body class="inner">
 <div id="site-header"></div>
 <main>
   <section class="hero sm">
@@ -49,23 +49,32 @@
         <div class="card"><h3>Stop and call a pro if</h3><ul class="plain"><li>You smell gas or a carbon monoxide alarm sounds. Leave the house and call 911 or your gas utility from outside.</li><li>The breaker trips a second time.</li><li>You see water around the unit, scorch marks, or smell burning.</li><li>The furnace starts, then shuts off again within a few minutes.</li></ul></div>
         <div class="card"><h3>While you wait</h3><ul class="plain"><li>Never heat your home with an oven, stove, or grill.</li><li>Keep space heaters three feet from anything that can burn, and turn them off when you leave the room or sleep.</li><li>In freezing weather, open cabinet doors under sinks and let faucets drip to protect pipes.</li></ul></div>
       </div>
-      <p class="small sub">These are general checks, not a diagnosis. If anything seems unsafe, stop and call a licensed contractor.</p>
+      <p class="small sub">These are general checks, not a diagnosis. If anything seems unsafe, stop and call a licensed professional.</p>
     </div>
   </section>
   <section class="sec">
     <div class="wrap">
       <h2>Still not working? See who can come.</h2>
-      <p class="lede" style="margin-bottom:8px">Licensed New Jersey contractors who are free reply with an arrival time and visit fee. Free for homeowners.</p>
-      <form class="book solo" id="book" action="/request" method="get">
-        <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p"><option value="no-heat" selected>No heat</option><option value="no-cooling">No cooling</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></select></div>
-        <div><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="07059" required></div>
-        <div><label for="b-timing">How soon</label><select id="b-timing" name="timing"><option value="As soon as possible">As soon as possible</option><option value="Later today">Later today</option><option value="Tomorrow">Tomorrow</option></select></div>
-        <input type="hidden" name="county" value="">
-        <button class="btn" type="submit">Find who can come</button>
+      <p class="lede" style="margin-bottom:16px">Licensed New Jersey pros who are free reply with an arrival time and visit fee. Free for homeowners.</p>
+      <form class="book solo" id="book" action="/request" method="get" data-service="heating" data-problem>
+        <fieldset class="svc"><legend>What kind of help do you need?</legend>
+          <label class="chip" for="b-s-heating"><input type="radio" id="b-s-heating" name="s" value="heating" checked><span>Heating</span></label>
+          <label class="chip" for="b-s-cooling"><input type="radio" id="b-s-cooling" name="s" value="cooling"><span>Cooling</span></label>
+          <label class="chip" for="b-s-plumbing"><input type="radio" id="b-s-plumbing" name="s" value="plumbing"><span>Plumbing</span></label>
+          <label class="chip" for="b-s-water-heater"><input type="radio" id="b-s-water-heater" name="s" value="water-heater"><span>Water heater</span></label>
+          <label class="chip" for="b-s-electrical"><input type="radio" id="b-s-electrical" name="s" value="electrical" disabled><span>Electrical<em>Soon</em></span></label>
+          <label class="chip" for="b-s-appliances"><input type="radio" id="b-s-appliances" name="s" value="appliances" disabled><span>Appliances<em>Soon</em></span></label>
+        </fieldset>
+        <div class="bar">
+          <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p"><optgroup label="Heating"><option value="no-heat" selected>No heat</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></optgroup><optgroup label="Cooling"><option value="no-cooling">No cooling</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></optgroup><optgroup label="Plumbing"><option value="burst-pipe">Burst or leaking pipe</option><option value="clog">Clogged drain or backup</option><option value="toilet">Toilet problem</option><option value="sump">Sump pump not working</option><option value="other">Something else</option></optgroup><optgroup label="Water heater"><option value="no-hot-water">No hot water</option><option value="wh-leak">Water heater leaking</option><option value="other">Something else</option></optgroup></select></div>
+          <div class="z"><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="07059" required></div>
+          <input type="hidden" name="county" value="">
+          <button class="btn" type="submit">Find who can come</button>
+        </div>
         <p class="err" id="b-err" role="alert" hidden></p>
-        <p class="foot"><b id="b-cov" role="status"></b> Smell gas or hear a CO alarm? Leave the house and call 911 or your gas utility first.</p>
+        <p class="foot"><b id="b-cov" role="status"></b>Free for homeowners. Smell gas, see sparks, or hear a CO alarm? Leave the house and call 911 first.</p>
       </form>
-      <p class="sub" style="margin-top:24px">Other quick checks: <a href="/help/no-cooling">No cooling</a> · <a href="/help/leak">Water leaking from unit</a> · <a href="/help/noise">Loud noise or burning smell</a> · <a href="/help/thermostat">Thermostat not working</a></p>
+      <p class="also" style="margin-top:24px"><span class="sub">Other quick checks:</span><a href="/help/no-cooling">No cooling</a><a href="/help/leak">Water leaking from unit</a><a href="/help/noise">Loud noise or burning smell</a><a href="/help/thermostat">Thermostat not working</a><a href="/help/burst-pipe">Burst or leaking pipe</a><a href="/help/clog">Clogged drain or backup</a><a href="/help/no-hot-water">No hot water</a></p>
     </div>
   </section>
 </main>

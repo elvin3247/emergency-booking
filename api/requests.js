@@ -4,21 +4,25 @@ const C = require('../lib/config');
 const store = require('../lib/store');
 const mail = require('../lib/mail');
 const E = require('../lib/emails');
-const { wrap, bad, str, isEmail, digits, token, isReady, canAlert } = require('../lib/http');
+const { wrap, bad, str, isEmail, digits, token, isReady, canAlert, tradeOf } = require('../lib/http');
 
 module.exports = wrap({
   async POST({ body }) {
     if (body.website) return { token: 'ok' }; // hidden field only bots fill in
     const r = {
-      problem: str(body.problem, 30), zip: str(body.zip, 5), county: str(body.county, 30), timing: str(body.timing, 40), system: str(body.system, 40),
+      service: str(body.service, 30), problem: str(body.problem, 30), zip: str(body.zip, 5), county: str(body.county, 30), timing: str(body.timing, 40), system: str(body.system, 40),
       note: str(body.note, 500), name: str(body.name, 80), phone: str(body.phone, 30), email: str(body.email, 120).toLowerCase(), address: str(body.address, 160), source: str(body.source, 120) || null
     };
     if (!C.problems[r.problem]) throw bad('Choose the problem you need help with.');
+    if (!r.service) r.service = C.problems[r.problem][2][0];
+    if (!C.services[r.service] || !C.problems[r.problem][2].includes(r.service)) throw bad('Choose the kind of help you need.');
+    if (!C.services[r.service].live) throw bad("We're not taking " + C.services[r.service].name.toLowerCase() + ' requests yet.');
+    const trade = tradeOf(r.service);
     if (!/^\d{5}$/.test(r.zip)) throw bad('Enter a 5-digit ZIP code.');
     if (!/^0[78]/.test(r.zip)) throw bad("We're only in New Jersey for now. NJ ZIP codes start with 07 or 08.");
     if (!C.counties.includes(r.county)) throw bad('Choose your county.');
     if (!C.timings.includes(r.timing)) r.timing = C.timings[0];
-    if (!C.systems.includes(r.system)) r.system = C.systems[0];
+    r.system = trade !== 'hvac' ? null : C.systems.includes(r.system) ? r.system : C.systems[0];
     if (!r.name) throw bad('Enter your name so the contractor knows who to ask for.');
     if (digits(r.phone).length < 10) throw bad('Enter a 10-digit phone number.');
     if (!isEmail(r.email)) throw bad('Enter a valid email address. We send your updates there.');
@@ -26,7 +30,7 @@ module.exports = wrap({
     if (body.consent !== true) throw bad('Check the box so we can contact you about this request.');
 
     const row = await store.insertRequest(Object.assign(r, { token: token(), status: 'open', consent_at: new Date().toISOString(), consent_text: C.consent.homeowner }));
-    const matches = (await store.contractorsForCounty(r.county)).filter(canAlert);
+    const matches = (await store.contractorsForCounty(r.county, trade)).filter(canAlert);
     const alerts = await store.insertAlerts(matches.map(c => ({ request_id: row.id, contractor_id: c.id, token: token(), response: 'none' })));
     const byId = Object.fromEntries(matches.map(c => [c.id, c]));
     await mail.sendAll(alerts.map(a => E.contractorAlert(byId[a.contractor_id], row, a)).concat([E.homeownerReceived(row, alerts.length), E.adminNewRequest(row, matches)]));
@@ -44,7 +48,7 @@ module.exports = wrap({
     const state = r.status === 'matched' ? 'matched' : now - created > C.OPEN_MS ? 'closed' : 'open';
     const out = {
       state, now, window_ends: created + C.WINDOW_MS, alerted: alerts.length,
-      request: { problem: r.problem, zip: r.zip, county: r.county, timing: r.timing, address: r.address },
+      request: { service: r.service, problem: r.problem, zip: r.zip, county: r.county, timing: r.timing, address: r.address },
       offers: state === 'open' ? accepted.slice(0, C.maxOffers).map(offer) : []
     };
     if (state === 'matched') {
@@ -52,7 +56,7 @@ module.exports = wrap({
       out.chosen = Object.assign(offer(a), { phone: cs[a.contractor_id].business_phone });
     } else if (!accepted.length && (!alerts.length || now > out.window_ends)) {
       // Nobody confirmed: be honest and give numbers to call directly.
-      out.backup = (await store.contractorsForCounty(r.county)).filter(isReady).slice(0, 5).map(c => ({ company: c.company, phone: c.business_phone, license: c.license }));
+      out.backup = (await store.contractorsForCounty(r.county, tradeOf(r.service) || 'hvac')).filter(isReady).slice(0, 5).map(c => ({ company: c.company, phone: c.business_phone, license: c.license }));
     }
     return out;
   }

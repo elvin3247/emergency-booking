@@ -1,13 +1,13 @@
-# Emergency HVAC booking site
+# Emergency home repair booking site
 
-Homeowners request emergency HVAC help, licensed contractors who can come say yes with an arrival time and visit fee, and the homeowner picks one. Static pages on Vercel, serverless functions in `api/`, Supabase for data, Resend for email. Vanilla JS, CommonJS, no framework, no build step.
+Homeowners request emergency help (heating, cooling, plumbing, water heaters, and more as you switch them on), licensed local pros who can come say yes with an arrival time and visit fee, and the homeowner picks one. Static pages on Vercel, serverless functions in `api/`, Supabase for data, Resend for email. Vanilla JS, CommonJS, no framework, no build step.
 
 ## Pages
 
 | Page | What it does |
 | --- | --- |
 | `/` | Home page: start a request, services, live county coverage (from `/api/coverage`) |
-| `/hvac`, `/hvac/<county>-county-nj` | Service areas and one page per county: booking bar, live contractor list, towns and ZIP codes |
+| `/hvac`, `/plumbing`, `/<trade>/<county>-county-nj` | For each trade that is switched on, an index and one page per county: booking bar, live contractor list, towns and ZIP codes |
 | `/help`, `/help/<problem>` | Troubleshooting guides ("quick checks") with a booking bar |
 | `/request` | Homeowner picks a problem and enters details |
 | `/status?t=...` | Homeowner's private page: who said yes, choose one, backups if no one confirms |
@@ -26,7 +26,7 @@ Homeowners request emergency HVAC help, licensed contractors who can come say ye
 ## Running it day to day
 
 - **Contractor setup:** a contractor gets no requests until they've added a visit fee and business phone (step 2) and you've approved them. They can pause themselves from the link in any alert; `paused_until` shows it in Supabase.
-- **Approve contractors:** each sign-up emails `ADMIN_EMAIL`. Check the license with the NJ HVACR board, then in Supabase > Table Editor > `contractors`, change `status` from `pending` to `approved`. Only approved contractors get alerts. Set `paused` to stop alerts.
+- **Approve contractors:** each sign-up emails `ADMIN_EMAIL`. Check the license with the state board for each trade they picked (the `trades` column: HVACR, master plumbers, electrical contractors), then in Supabase > Table Editor > `contractors`, change `status` from `pending` to `approved`. Only approved contractors get alerts. Set `paused` to stop alerts.
 - **Requests:** you get an email for every request. The subject starts with `COVERAGE GAP` when no approved contractor covers that county at that hour.
 - **Lead fees:** each match emails you the fee owed ($0 while a contractor has free leads left). The amount is saved in `alerts.lead_fee`. Billing is manual for now.
 - **Brand name, lead fee, time limits, problem list:** all in `public/assets/config.js`.
@@ -57,3 +57,14 @@ In this mode contractors are approved automatically and the links from each "ema
 - An admin screen. Use the Supabase table editor.
 - ZIP to county lookup. Homeowners pick their county.
 - Rate limiting beyond a hidden spam-trap field.
+
+## Services and trades
+
+`public/assets/config.js` has two lists:
+
+- **`services`** is what homeowners pick (Heating, Cooling, Plumbing, Water heater, Electrical, Appliances). Each points at a trade.
+- **`trades`** is what contractors sign up as (HVAC, plumbing, electrical, appliance repair). A request only alerts contractors in the matching trade who cover that county.
+
+A service with `live: false` shows as "Soon" on the site and can't be requested, but contractors in that trade can already apply. To open one up, set `live: true`, run `npm run build` (this creates its county pages), and commit.
+
+If your database was created before this change, run `supabase/schema.sql` again. It adds the `trades` and `service` columns and is safe to rerun. Existing contractors default to HVAC.

@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- seo:start -->
-<title>Emergency HVAC Leads in New Jersey: Pay Only When Chosen | YourBrand</title>
-<meta name="description" content="Get emergency HVAC requests in the New Jersey counties and hours you choose. First 3 chosen leads free, then $50 only when a customer picks you. No monthly fee.">
+<title>Emergency Repair Leads in New Jersey: Pay Only When Chosen | YourBrand</title>
+<meta name="description" content="HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. First 3 chosen leads free, then $50 only when a customer picks you. No monthly fee.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="YourBrand">
-<meta property="og:title" content="Emergency HVAC Leads in New Jersey: Pay Only When Chosen">
-<meta property="og:description" content="Get emergency HVAC requests in the New Jersey counties and hours you choose. First 3 chosen leads free, then $50 only when a customer picks you. No monthly fee.">
+<meta property="og:title" content="Emergency Repair Leads in New Jersey: Pay Only When Chosen">
+<meta property="og:description" content="HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. First 3 chosen leads free, then $50 only when a customer picks you. No monthly fee.">
 <meta name="twitter:card" content="summary_large_image">
 <!-- seo:end -->
 <!-- head:start -->
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#FFC72C">
+<meta name="theme-color" content="#E9EDF1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
 <!-- head:end -->
 </head>
@@ -26,10 +26,10 @@
 <main>
   <section class="hero sm">
     <div class="wrap">
-      <p class="eyebrow">For New Jersey HVAC contractors</p>
+      <p class="eyebrow">For New Jersey HVAC, plumbing, electrical, and appliance pros</p>
       <h1>Emergency jobs. Your hours. Your counties.</h1>
       <p class="lede">Homeowners near you who need help now. You answer only the requests you can take, with one tap.</p>
-      <div style="padding-bottom:8px"><a class="btn lg dark" href="#apply">Apply in 30 seconds</a></div>
+      <div><a class="btn lg" href="#apply">Apply in 30 seconds</a></div>
     </div>
   </section>
 
@@ -41,7 +41,7 @@
         <div class="phone" aria-label="Example of a job alert and the response screen">
           <div class="bubble"><b data-brand></b>: New no heat request in Somerset County (07059). Customer wants help as soon as possible. <u>Tap to say you can come</u></div>
           <div class="mock">
-            <p class="eyebrow">Somerset County · ZIP 07059</p>
+            <p class="small sub"><b>Somerset County · ZIP 07059</b></p>
             <p class="mockh">No heat</p>
             <p class="small sub">As soon as possible · Gas furnace</p>
             <p class="mockq">When can you get there?</p>
@@ -67,11 +67,12 @@
   <section class="sec" id="apply">
     <div class="wrap">
       <div class="narrow">
-        <div><p class="eyebrow">Step 1 of 2 · About 30 seconds</p><h2>Apply to join</h2><p class="sub">We check your license with the state before you get any requests. Your visit fee and business phone come next.</p></div>
+        <div class="stack"><p class="eyebrow">Step 1 of 2 · About 30 seconds</p><h2>Apply to join</h2><p class="sub">We check your license with the state before you get any requests. Your visit fee and business phone come next.</p></div>
         <form class="card" id="f" novalidate>
           <div class="row"><div><label for="company">Company name</label><input type="text" id="company" autocomplete="organization"></div><div><label for="contact">Your name</label><input type="text" id="contact" autocomplete="name"></div></div>
           <div class="row"><div><label for="email">Email for job alerts</label><input type="email" id="email" autocomplete="email"></div><div><label for="mobile">Mobile number</label><input type="tel" id="mobile" autocomplete="tel"></div></div>
-          <div><label for="license">NJ HVACR license number</label><input type="text" id="license" placeholder="19HC00000000" autocapitalize="characters"></div>
+          <div><label id="trades-l">What work do you do?</label><div class="chips" role="group" aria-labelledby="trades-l" id="trades"></div></div>
+          <div><label for="license">New Jersey license number</label><input type="text" id="license" autocapitalize="characters"><p class="small sub" style="margin-top:4px" id="license-help">The state license for your trade. More than one trade? Separate the numbers with commas.</p></div>
           <div><label id="counties-l">Counties you serve</label><div class="chips" role="group" aria-labelledby="counties-l" id="chips"></div></div>
           <div class="hp" aria-hidden="true"><label for="website">Leave this empty</label><input type="text" id="website" tabindex="-1" autocomplete="off"></div>
           <label class="check" for="consent"><input type="checkbox" id="consent"><span id="consent-text"></span></label>
@@ -88,6 +89,7 @@
 <script>
 document.querySelectorAll('.free-leads').forEach(function (e) { e.textContent = SITE.freeLeads; });
 document.querySelectorAll('.lead-fee').forEach(function (e) { e.textContent = SITE.leadFee; });
+document.getElementById('trades').innerHTML = Object.keys(SITE.trades).map(function (t) { return '<label class="chip" for="t-' + t + '"><input type="checkbox" id="t-' + t + '" value="' + t + '"><span>' + SITE.trades[t].name + '</span></label>'; }).join('');
 document.getElementById('chips').innerHTML = SITE.counties.map(function (c, i) { return '<label class="chip" for="c' + i + '"><input type="checkbox" id="c' + i + '" value="' + c + '"><span>' + c + '</span></label>'; }).join('');
 document.getElementById('consent-text').innerHTML = esc(SITE.consent.contractor) + ' See our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.';
 document.getElementById('f').addEventListener('submit', async function (e) {
@@ -96,7 +98,8 @@ document.getElementById('f').addEventListener('submit', async function (e) {
   err.hidden = true; go.disabled = true; go.textContent = 'Sending...';
   try {
     var out = await api('/api/contractors', { company: v('company'), contact: v('contact'), email: v('email'), mobile: v('mobile'), license: v('license'), website: v('website'), source: siteSource(),
-      counties: Array.prototype.map.call(document.querySelectorAll('.chip input:checked'), function (i) { return i.value; }), consent: document.getElementById('consent').checked });
+      trades: Array.prototype.map.call(document.querySelectorAll('#trades input:checked'), function (i) { return i.value; }),
+      counties: Array.prototype.map.call(document.querySelectorAll('#chips input:checked'), function (i) { return i.value; }), consent: document.getElementById('consent').checked });
     track('contractor_applied');
     location.href = '/pro?t=' + encodeURIComponent(out.token);
   } catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Continue'; }
