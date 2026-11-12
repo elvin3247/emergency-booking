@@ -20,7 +20,7 @@ function view({ alert, request: r, contractor, state }) {
     state, company: contractor.company,
     request: { problem: r.problem, zip: r.zip, county: r.county, timing: r.timing, system: r.system, note: r.note },
     mine: { arrival: alert.arrival, visit_fee: alert.visit_fee == null ? contractor.visit_fee : alert.visit_fee },
-    free_leads_left: contractor.free_leads_left
+    free_leads_left: contractor.free_leads_left, manage: contractor.manage_token
   };
   if (state === 'chosen') {
     out.customer = { name: r.name, phone: r.phone, email: r.email, address: r.address };

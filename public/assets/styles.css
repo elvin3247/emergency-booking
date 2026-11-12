@@ -175,3 +175,60 @@ ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
   .nav a.hide-sm{display:none}
   .counties{grid-template-columns:1fr 1fr}
 }
+
+/* County pages, guides, and the pieces added for search and returning visitors */
+.hero.sm .wrap{padding-block:32px 0}
+.hero.sm h1{font-size:clamp(2.4rem,6vw,4.25rem);max-width:16em}
+.hero.sm:not(:has(.book)) .wrap{padding-bottom:40px}
+.crumbs{font-size:.95rem;font-weight:600}
+.crumbs a{color:var(--on-yellow)}
+.book input[type=text]{border:0;font-weight:600;font-size:1.05rem;padding:13px 12px;background:#FFFFFF;color:#111111}
+.book.solo{border-radius:6px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
+.two>*{min-width:0}
+.towns{list-style:none;margin:0;padding:0;columns:2;column-gap:24px;font-weight:600}
+.towns li{break-inside:avoid;padding:3px 0}
+.towns span{font-weight:400;color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
+.guide{max-width:820px;display:flex;flex-direction:column;gap:24px}
+.checks{list-style:none;margin:0;padding:0;counter-reset:chk;border-top:3px solid var(--ink)}
+.checks li{counter-increment:chk;display:grid;grid-template-columns:56px 1fr;gap:2px 12px;padding:16px 4px;border-bottom:1px solid var(--line)}
+.checks li::before{content:counter(chk);grid-row:1 / span 2;font:800 2.6rem var(--display);line-height:1}
+.checks b{font-size:1.25rem}
+.checks p{grid-column:2;color:var(--muted)}
+.rows .r{display:flex;align-items:center;gap:14px;padding:18px 4px;border-bottom:1px solid var(--line)}
+.rows .r a{display:block;padding:0;border:0}
+.rows .r .main{flex:1;min-width:0;text-decoration:none;color:var(--ink)}
+.rows .r .main span{display:block}
+.rows .r .quick{font-size:.92rem;font-weight:700;white-space:nowrap;color:var(--ink)}
+.rows .r .arrow{text-decoration:none}
+.rows .r.soon{opacity:.55}
+.openreq{background:var(--accent-soft);border-bottom:1px solid var(--line)}
+.openreq .wrap{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px;font-weight:600}
+.ftr .credit{flex:1 1 100%;font-size:.82rem}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+@media (max-width:440px){.towns{columns:1}.rows .r .quick{display:none}}
+
+/* Contractor pages: one-tap response, settings, sign-up */
+.ask{font-size:clamp(1.9rem,6vw,2.4rem)}
+.arrive{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.arrive .btn{font-size:1.25rem;padding:18px 12px;min-height:64px}
+.arrive.mini{gap:6px}
+.arrive.mini span{background:var(--yellow);color:var(--on-yellow);font:800 .95rem var(--display);text-transform:uppercase;letter-spacing:.03em;text-align:center;padding:10px 6px;border-radius:4px}
+.linkbtn{font:700 .95rem var(--body);background:none;border:0;padding:4px;color:var(--ink);text-decoration:underline;cursor:pointer}
+.feeline{font-size:1.05rem}
+.feeedit input{max-width:200px}
+.pausebtns{display:flex;flex-direction:column;gap:8px}
+.pausebtns .btn{text-align:left}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-weight:700;max-width:calc(100% - 32px);z-index:20}
+.phone{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;max-width:380px}
+.bubble{background:var(--bg);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:.95rem}
+.bubble u{font-weight:700}
+.mock{border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.mockh{font:800 2rem var(--display);text-transform:uppercase;line-height:1}
+.mockq{font:800 1.2rem var(--display);text-transform:uppercase;margin-top:6px}
+.deal{list-style:none;margin:0;padding:0;border-top:3px solid var(--ink)}
+.deal li{display:flex;flex-direction:column;padding:14px 4px;border-bottom:1px solid var(--line)}
+.deal b{font:800 1.5rem var(--display);text-transform:uppercase;line-height:1.1}
+.deal span{color:var(--muted)}
+.deal b span{color:inherit}
+@media (max-width:440px){.arrive .btn{font-size:1.1rem;padding:16px 8px}}

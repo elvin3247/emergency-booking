@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /api/
+Disallow: /status
+Disallow: /respond
+Disallow: /pro

@@ -8,12 +8,14 @@ create table if not exists contractors (
   contact text,
   email text not null unique,          -- job alerts go here until texting is added
   mobile text not null,                -- for text alerts later
-  business_phone text not null,        -- shown to customers
+  business_phone text,                 -- shown to customers; set in step 2 of sign-up
   license text not null,               -- NJ HVACR license number; verify before approving
   counties text[] not null,
-  visit_fee integer not null,
+  visit_fee integer,                   -- set in step 2 of sign-up; no alerts until it is
   alert_hours text not null default 'any',   -- any | day | weekday | nights
-  status text not null default 'pending',    -- pending | approved | paused
+  status text not null default 'pending',    -- pending | approved | paused (you set this)
+  manage_token text unique,            -- contractor's private link to pause alerts and change settings
+  paused_until timestamptz,            -- the contractor's own pause; null = taking requests
   free_leads_left integer not null default 3,
   consent_at timestamptz not null,
   consent_text text not null
@@ -58,6 +60,17 @@ create table if not exists alerts (
 
 create index if not exists alerts_request_idx on alerts(request_id);
 create index if not exists contractors_counties_idx on contractors using gin(counties);
+
+-- Where the visitor came from (referral partner code, ad campaign, or referring site).
+-- Safe to run again on an existing database.
+alter table requests add column if not exists source text;
+alter table contractors add column if not exists source text;
+
+-- Contractor self-service (safe to run again on an existing database).
+alter table contractors add column if not exists manage_token text unique default replace(gen_random_uuid()::text, '-', '');
+alter table contractors add column if not exists paused_until timestamptz;
+alter table contractors alter column visit_fee drop not null;
+alter table contractors alter column business_phone drop not null;
 
 -- The site only talks to the database from server functions using the service role key.
 -- Row level security with no policies blocks everything else.

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- seo:start -->
+<title>Your contractor settings | YourBrand</title>
+<meta name="robots" content="noindex">
+<!-- seo:end -->
+<!-- head:start -->
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#FFC72C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+<!-- head:end -->
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="narrow" id="app"><p class="sub">Loading your settings...</p></div></div></main>
+<div class="toast" id="toast" role="status" hidden></div>
+<div id="site-footer"></div>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+// A contractor's private page, opened from any alert or the confirmation email. No password: the link is the key.
+var app = document.getElementById('app'), Q = new URLSearchParams(location.search), t = Q.get('t'), D = null, toastT;
+function toast(m) { var el = document.getElementById('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { el.hidden = true; }, 3500); }
+var when = function (iso) {
+  if (new Date(iso).getUTCFullYear() >= 2100) return 'you turn them back on';
+  return new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', hour: 'numeric', minute: '2-digit' });
+};
+
+function settingsForm(first) {
+  return '<form class="card" id="f" novalidate>' +
+    '<div class="row"><div><label for="visit_fee">Visit fee customers see ($)</label><input type="number" id="visit_fee" min="0" max="1000" step="1" inputmode="numeric" value="' + esc(D.visit_fee == null ? '' : D.visit_fee) + '"><p class="small sub" style="margin-top:4px">For the trip and diagnosis. You can change it on any job.</p></div>' +
+    '<div><label for="business_phone">Business phone customers call</label><input type="tel" id="business_phone" autocomplete="tel" value="' + esc(D.business_phone || '') + '"></div></div>' +
+    '<div><label for="alert_hours">When should we send requests?</label><select id="alert_hours">' + Object.keys(SITE.alertHours).map(function (k) { return '<option value="' + k + '"' + (k === D.alert_hours ? ' selected' : '') + '>' + SITE.alertHours[k] + '</option>'; }).join('') + '</select></div>' +
+    (first ? '' : '<div><label id="counties-l">Counties you serve</label><div class="chips" role="group" aria-labelledby="counties-l">' + SITE.counties.map(function (c, i) { return '<label class="chip" for="c' + i + '"><input type="checkbox" id="c' + i + '" value="' + c + '"' + (D.counties.indexOf(c) > -1 ? ' checked' : '') + '><span>' + c + '</span></label>'; }).join('') + '</div></div>') +
+    '<p class="err" id="err" role="alert" hidden></p>' +
+    '<div><button class="btn" type="submit" id="go">' + (first ? 'Finish setup' : 'Save changes') + '</button></div></form>';
+}
+
+function render() {
+  var h = '';
+  if (!D.setup_complete) {
+    h = '<div><p class="eyebrow">Step 2 of 2</p><h1>Finish your setup</h1><p class="sub">Two details and you\'re done. Customers see both before they choose you.</p></div>' + settingsForm(true);
+  } else {
+    var paused = !!D.paused_until, pending = D.status !== 'approved';
+    h = '<div><p class="eyebrow">' + esc(D.company) + '</p><h1>Your alerts</h1></div>';
+    h += pending
+      ? '<div class="notice warn"><b>We\'re checking your NJ HVACR license.</b> Requests start once you\'re approved. We\'ll email ' + esc(D.email) + '.</div>'
+      : paused
+        ? '<div class="notice warn"><b>Paused until ' + esc(when(D.paused_until)) + '.</b> You won\'t get requests until then.</div>'
+        : D.in_hours
+          ? '<div class="notice good"><b>You\'re on call.</b> Requests in ' + D.counties.length + ' ' + (D.counties.length === 1 ? 'county' : 'counties') + ' go to ' + esc(D.email) + '.</div>'
+          : '<div class="notice warn"><b>Outside your alert hours right now.</b> Requests start again at your set hours: ' + esc(SITE.alertHours[D.alert_hours]) + '.</div>';
+    h += '<div class="card"><h2>' + (paused ? 'Ready to take jobs?' : 'Taking a break?') + '</h2>' +
+      (paused
+        ? '<div><button class="btn" type="button" data-pause="resume">Resume alerts now</button></div>'
+        : '<p class="sub">Pause without losing your spot. Nothing counts against you.</p><div class="pausebtns">' +
+          '<button class="btn ghost" type="button" data-pause="morning">Until 7am</button>' +
+          '<button class="btn ghost" type="button" data-pause="monday">Until Monday 7am</button>' +
+          '<button class="btn ghost" type="button" data-pause="off">Until I turn them back on</button></div>') + '</div>';
+    h += '<p class="sub">' + (D.free_leads_left > 0 ? 'Free leads left: <b>' + D.free_leads_left + '</b>. After that, $' + SITE.leadFee + ' only when a customer chooses you.' : 'You pay $' + SITE.leadFee + ' only when a customer chooses you.') + '</p>';
+    h += '<h2>Your settings</h2>' + settingsForm(false);
+    h += '<p class="small sub">Keep this page private. Anyone with the link can change your settings.</p>';
+  }
+  app.innerHTML = h;
+}
+async function load() {
+  try { D = await api('/api/pro?t=' + encodeURIComponent(t || '')); render(); }
+  catch (e) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div>'; }
+}
+app.addEventListener('click', async function (e) {
+  var b = e.target.closest('[data-pause]'); if (!b) return;
+  document.querySelectorAll('[data-pause]').forEach(function (x) { x.disabled = true; });
+  try { D = await api('/api/pro', { t: t, action: 'pause', until: b.dataset.pause }); render(); toast(D.paused_until ? 'Alerts paused.' : 'Alerts are back on.'); window.scrollTo(0, 0); }
+  catch (x) { render(); toast(x.message); }
+});
+app.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  var first = !D.setup_complete, v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
+  var body = { t: t, action: 'settings', visit_fee: v('visit_fee'), business_phone: v('business_phone'), alert_hours: v('alert_hours') };
+  if (!first) body.counties = Array.prototype.map.call(document.querySelectorAll('.chip input:checked'), function (i) { return i.value; });
+  err.hidden = true; go.disabled = true; go.textContent = 'Saving...';
+  try { D = await api('/api/pro', body); render(); toast(first ? 'Setup complete.' : 'Saved.'); if (first) { track('contractor_setup_done'); window.scrollTo(0, 0); } }
+  catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = first ? 'Finish setup' : 'Save changes'; }
+});
+load();
+</script>
+</body>
+</html>

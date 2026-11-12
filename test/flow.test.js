@@ -85,6 +85,42 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     const cov = (await call('/api/coverage')).data;
     assert.strictEqual(cov.counties.Somerset, 'now'); assert.strictEqual(cov.counties.Bergen, 'now'); assert.strictEqual(cov.counties.Ocean, 'none');
     assert.deepStrictEqual(cov.visit_fee, { min: 81, max: 85 });
+    assert.strictEqual(cov.contractors, undefined);
+    const som = (await call('/api/coverage?county=Somerset')).data;
+    assert.strictEqual(som.contractors.length, 4); assert.deepStrictEqual(Object.keys(som.contractors[0]).sort(), ['company', 'license'], 'county list shows name and license only');
+
+    // Visitor source is saved with the request
+    r = await call('/api/requests', request({ source: 'ref:agent-smith' }));
+    assert.strictEqual(store._tables.requests.find(x => x.token === r.data.token).source, 'ref:agent-smith');
+    assert.ok(mail.outbox.some(m => m.to === 'admin@example.com' && /ref:agent-smith/.test(m.html)), 'admin email shows the source');
+    // Two-step sign-up: no requests until setup is finished; pause and resume
+    const signup = await call('/api/contractors', { company: 'Step Co', contact: 'Lee', email: 'step@example.com', mobile: '908-555-0177', license: '19HC00009999', counties: ['Somerset'], consent: true });
+    assert.strictEqual(signup.status, 200); const mt = signup.data.token; assert.ok(mt);
+    let pro = (await call('/api/pro?t=' + mt)).data;
+    assert.strictEqual(pro.setup_complete, false);
+    assert.ok(mail.outbox.some(m => m.to === 'step@example.com' && m.html.includes('/pro?t=' + mt) && /Finish your setup/.test(m.html)), 'confirmation email links to setup');
+    const alertedNow = async () => { const x = await call('/api/requests', request()); return (await call('/api/requests?token=' + x.data.token)).data.alerted; };
+    const base = await alertedNow();
+    assert.strictEqual((await call('/api/pro', { t: mt, action: 'settings', visit_fee: '', business_phone: '908-555-0188' })).status, 400);
+    pro = (await call('/api/pro', { t: mt, action: 'settings', visit_fee: 99, business_phone: '908-555-0188', alert_hours: 'any' })).data;
+    assert.strictEqual(pro.setup_complete, true);
+    assert.strictEqual(await alertedNow(), base + 1, 'alerted once setup is done');
+    const al = mail.outbox.filter(m => m.to === 'step@example.com' && /respond\?t=/.test(m.html)).pop();
+    assert.ok(al.html.includes('/pro?t=' + mt), 'alert email links to the pause page');
+    const at = al.html.match(/respond\?t=([\w-]+)/)[1];
+    assert.strictEqual((await call('/api/alerts?t=' + at)).data.manage, mt);
+    assert.strictEqual((await call('/api/alerts', { t: at, action: 'accept', arrival: 'Within 1 hour', visit_fee: 99 })).data.state, 'accepted', 'one-tap accept');
+    pro = (await call('/api/pro', { t: mt, action: 'pause', until: 'monday' })).data;
+    assert.ok(new Date(pro.paused_until) > new Date());
+    const nj = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', hourCycle: 'h23' }).format(new Date(pro.paused_until));
+    assert.ok(/^Mon,? 07$/.test(nj.trim()), 'pause ends Monday 7am NJ time, got ' + nj);
+    assert.strictEqual(await alertedNow(), base, 'paused contractor is not alerted');
+    assert.strictEqual((await call('/api/coverage?county=Somerset')).data.contractors.length, 5, 'paused contractor still listed on county page');
+    pro = (await call('/api/pro', { t: mt, action: 'pause', until: 'resume' })).data;
+    assert.strictEqual(pro.paused_until, null);
+    assert.strictEqual(await alertedNow(), base + 1);
+    assert.strictEqual((await call('/api/pro?t=nope')).status, 404);
+
     console.log('All booking flow checks passed.');
   } finally { server.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

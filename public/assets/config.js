@@ -4,6 +4,8 @@
   var brand = 'YourBrand';
   var C = {
     brand: brand,
+    siteUrl: '',        // your live address, e.g. 'https://example.com'. Needed for the sitemap and share previews. Run `npm run build` after changing.
+    analytics: 'vercel', // page-view counts via Vercel Web Analytics (turn it on in the Vercel dashboard). Set to '' to remove.
     leadFee: 50,        // dollars per chosen lead
     freeLeads: 3,       // first chosen leads are free
     maxOffers: 3,       // contractors a customer can choose between
@@ -30,7 +32,7 @@
     // Have a lawyer review both of these before launch.
     consent: {
       homeowner: 'I agree to get emails and texts from ' + brand + ' about this request, and a call, text, or email from the one contractor I choose.',
-      contractor: 'I agree to get job alerts from ' + brand + ' by email and text at the contacts above, to the lead terms on this page, and to my business phone being shown to customers.'
+      contractor: 'I agree to get job alerts from ' + brand + ' by email and text at the contacts above, to the lead terms on this page, and to my company name, license number, and business phone being shown on the site.'
     }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = C;

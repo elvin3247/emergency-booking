@@ -4,14 +4,14 @@ const C = require('../lib/config');
 const store = require('../lib/store');
 const mail = require('../lib/mail');
 const E = require('../lib/emails');
-const { wrap, bad, str, isEmail, digits, token, withinHours } = require('../lib/http');
+const { wrap, bad, str, isEmail, digits, token, isReady, canAlert } = require('../lib/http');
 
 module.exports = wrap({
   async POST({ body }) {
     if (body.website) return { token: 'ok' }; // hidden field only bots fill in
     const r = {
       problem: str(body.problem, 30), zip: str(body.zip, 5), county: str(body.county, 30), timing: str(body.timing, 40), system: str(body.system, 40),
-      note: str(body.note, 500), name: str(body.name, 80), phone: str(body.phone, 30), email: str(body.email, 120).toLowerCase(), address: str(body.address, 160)
+      note: str(body.note, 500), name: str(body.name, 80), phone: str(body.phone, 30), email: str(body.email, 120).toLowerCase(), address: str(body.address, 160), source: str(body.source, 120) || null
     };
     if (!C.problems[r.problem]) throw bad('Choose the problem you need help with.');
     if (!/^\d{5}$/.test(r.zip)) throw bad('Enter a 5-digit ZIP code.');
@@ -26,7 +26,7 @@ module.exports = wrap({
     if (body.consent !== true) throw bad('Check the box so we can contact you about this request.');
 
     const row = await store.insertRequest(Object.assign(r, { token: token(), status: 'open', consent_at: new Date().toISOString(), consent_text: C.consent.homeowner }));
-    const matches = (await store.contractorsForCounty(r.county)).filter(c => withinHours(c.alert_hours));
+    const matches = (await store.contractorsForCounty(r.county)).filter(canAlert);
     const alerts = await store.insertAlerts(matches.map(c => ({ request_id: row.id, contractor_id: c.id, token: token(), response: 'none' })));
     const byId = Object.fromEntries(matches.map(c => [c.id, c]));
     await mail.sendAll(alerts.map(a => E.contractorAlert(byId[a.contractor_id], row, a)).concat([E.homeownerReceived(row, alerts.length), E.adminNewRequest(row, matches)]));
@@ -52,7 +52,7 @@ module.exports = wrap({
       out.chosen = Object.assign(offer(a), { phone: cs[a.contractor_id].business_phone });
     } else if (!accepted.length && (!alerts.length || now > out.window_ends)) {
       // Nobody confirmed: be honest and give numbers to call directly.
-      out.backup = (await store.contractorsForCounty(r.county)).slice(0, 5).map(c => ({ company: c.company, phone: c.business_phone, license: c.license }));
+      out.backup = (await store.contractorsForCounty(r.county)).filter(isReady).slice(0, 5).map(c => ({ company: c.company, phone: c.business_phone, license: c.license }));
     }
     return out;
   }

@@ -3,34 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Emergency HVAC help in New Jersey</title>
-<meta name="description" content="No heat or no cooling? Tell us the problem and licensed New Jersey HVAC contractors who can come reply with an arrival time and visit fee. You choose.">
+<!-- seo:start -->
+<title>Emergency HVAC Repair in New Jersey, 24/7: See Who Can Come | YourBrand</title>
+<meta name="description" content="No heat or no AC? Tell us what&#39;s wrong and licensed New Jersey HVAC contractors who are free reply with an arrival time and visit fee. You choose. Free for homeowners.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="YourBrand">
+<meta property="og:title" content="Emergency HVAC Repair in New Jersey, 24/7: See Who Can Come">
+<meta property="og:description" content="No heat or no AC? Tell us what&#39;s wrong and licensed New Jersey HVAC contractors who are free reply with an arrival time and visit fee. You choose. Free for homeowners.">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"YourBrand"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Service","serviceType":"Emergency HVAC repair","name":"Emergency heating and cooling repair","provider":{"@type":"Organization","name":"YourBrand"},"areaServed":{"@type":"State","name":"New Jersey"},"hoursAvailable":{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],"opens":"00:00","closes":"23:59"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What does it cost me?","acceptedAnswer":{"@type":"Answer","text":"Nothing to use YourBrand. You pay the contractor directly for the visit and any repair you approve."}},{"@type":"Question","name":"Who are the contractors?","acceptedAnswer":{"@type":"Answer","text":"Independent New Jersey HVAC companies. Each one gives us its state HVACR license number, and we check it before they can receive requests. They aren't our employees, and they set their own prices."}},{"@type":"Question","name":"How fast will someone answer?","acceptedAnswer":{"@type":"Answer","text":"It depends on who's free near you. Your request page shows each yes as it comes in, and after 15 minutes with no answer we show contractors you can call directly."}},{"@type":"Question","name":"What if no one can come?","acceptedAnswer":{"@type":"Answer","text":"We tell you and show contractors you can call directly. Your request stays open for 12 hours, and we email you if someone accepts later."}},{"@type":"Question","name":"Who sees my phone number?","acceptedAnswer":{"@type":"Answer","text":"Only the one contractor you choose. Contractors who respond see your ZIP code and the problem, not your name, number, or address."}},{"@type":"Question","name":"What is a visit fee?","acceptedAnswer":{"@type":"Answer","text":"It's what the contractor charges to come out and diagnose the problem. Each contractor sets their own and you see it before you choose. Any repair is quoted on site, and you decide whether to go ahead."}},{"@type":"Question","name":"Do you do plumbing or electrical?","acceptedAnswer":{"@type":"Answer","text":"Not yet. We're starting with heating and cooling so we can do it well."}}]}</script>
+<!-- seo:end -->
+<!-- head:start -->
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#FFC72C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
+<!-- head:end -->
 </head>
 <body class="home">
 <div id="site-header"></div>
 <main>
-  <!-- Hero: headline, then booking right under it -->
+  <!-- Hero: headline, then booking right under it. Blocks between "x:start" and "x:end" are filled in by `npm run build`. -->
   <section class="hero">
     <div class="wrap">
       <p class="eyebrow">Emergency heating and cooling · New Jersey · 24/7</p>
-      <h1>No heat? See who can come tonight.</h1>
+      <h1 id="hero-h1">No heat? See who can come tonight.</h1>
       <p class="lede">Licensed contractors who are free reply with an arrival time and visit fee. You pick one. Free for homeowners.</p>
-      <form class="book" id="book" novalidate>
-        <div><label for="b-problem">What's wrong</label><select id="b-problem"></select></div>
-        <div><label for="b-county">County</label><select id="b-county"><option value="">Choose your county</option></select></div>
-        <div><label for="b-timing">How soon</label><select id="b-timing"></select></div>
+<!-- book:start -->
+      <form class="book" id="book" action="/request" method="get">
+        <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p"><option value="no-heat">No heat</option><option value="no-cooling">No cooling</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></select></div>
+        <div><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="07059" required></div>
+        <div><label for="b-timing">How soon</label><select id="b-timing" name="timing"><option value="As soon as possible">As soon as possible</option><option value="Later today">Later today</option><option value="Tomorrow">Tomorrow</option></select></div>
+        <input type="hidden" name="county" value="">
         <button class="btn" type="submit">Find who can come</button>
         <p class="err" id="b-err" role="alert" hidden></p>
         <p class="foot"><b id="b-cov" role="status"></b> Smell gas or hear a CO alarm? Leave the house and call 911 or your gas utility first.</p>
       </form>
+<!-- book:end -->
     </div>
   </section>
 
-  <!-- What the homeowner can count on -->
   <section class="wrap">
     <div class="proof">
       <div><b>Real yes</b><span>Only contractors who said they can come</span></div>
@@ -39,38 +55,71 @@
     </div>
   </section>
 
-  <!-- Problems -->
   <section class="sec" id="services">
     <div class="wrap">
       <h2>Pick your problem</h2>
-      <div class="rows" id="rows"></div>
+      <p class="lede" style="margin-bottom:16px">Start a request, or try our quick checks first. A dead battery shouldn't cost you a visit fee.</p>
+      <div class="rows">
+<!-- rows:start -->
+        <div class="r"><a class="main" href="/request?p=no-heat"><b>No heat</b><span>Furnace, boiler, or heat pump not heating</span></a><a class="quick" href="/help/no-heat">Quick checks</a><a class="arrow" href="/request?p=no-heat" aria-label="Request help: No heat">&rarr;</a></div>
+        <div class="r"><a class="main" href="/request?p=no-cooling"><b>No cooling</b><span>AC or heat pump not cooling</span></a><a class="quick" href="/help/no-cooling">Quick checks</a><a class="arrow" href="/request?p=no-cooling" aria-label="Request help: No cooling">&rarr;</a></div>
+        <div class="r"><a class="main" href="/request?p=leak"><b>Water leaking from unit</b><span>Water around the furnace or air handler</span></a><a class="quick" href="/help/leak">Quick checks</a><a class="arrow" href="/request?p=leak" aria-label="Request help: Water leaking from unit">&rarr;</a></div>
+        <div class="r"><a class="main" href="/request?p=noise"><b>Loud noise or burning smell</b><span>Banging, grinding, or an electrical smell</span></a><a class="quick" href="/help/noise">Quick checks</a><a class="arrow" href="/request?p=noise" aria-label="Request help: Loud noise or burning smell">&rarr;</a></div>
+        <div class="r"><a class="main" href="/request?p=thermostat"><b>Thermostat not working</b><span>Blank screen or system will not respond</span></a><a class="quick" href="/help/thermostat">Quick checks</a><a class="arrow" href="/request?p=thermostat" aria-label="Request help: Thermostat not working">&rarr;</a></div>
+        <div class="r"><a class="main" href="/request?p=other"><b>Something else</b><span>Describe it in the next step</span></a><a class="arrow" href="/request?p=other" aria-label="Request help: Something else">&rarr;</a></div>
+        <div class="r soon"><span class="main"><b>Plumbing, electrical</b><span>Coming later</span></span></div>
+<!-- rows:end -->
+      </div>
     </div>
   </section>
 
-  <!-- How it works -->
   <section class="sec" id="how">
     <div class="wrap">
       <h2>How it works</h2>
+<!-- how:start -->
       <ol class="how">
-        <li><span class="n">1</span><b>Tell us the problem</b><span>What's wrong, your county, and how soon. About a minute.</span></li>
+        <li><span class="n">1</span><b>Tell us the problem</b><span>What's wrong, your ZIP, and how soon. About a minute.</span></li>
         <li><span class="n">2</span><b>Contractors say yes</b><span>Each one who's free sends an arrival time and visit fee.</span></li>
-        <li><span class="n">3</span><b>You choose</b><span>Compare up to <span class="max-offers">3</span>. Only the one you pick gets your name, number, and address.</span></li>
+        <li><span class="n">3</span><b>You choose</b><span>Compare up to 3. Only the one you pick gets your name, number, and address.</span></li>
       </ol>
+<!-- how:end -->
       <p class="sub" style="margin-top:20px">No one free within <span class="window-min">15</span> minutes? We say so and show contractors you can call directly.</p>
     </div>
   </section>
 
-  <!-- Live coverage -->
   <section class="sec" id="areas">
     <div class="wrap">
       <h2>Where we're taking requests</h2>
-      <p class="lede" style="margin-bottom:16px">We're adding contractors county by county. This updates live. Pick yours to start.</p>
+      <p class="lede" style="margin-bottom:16px">We're adding contractors county by county. This updates live. Pick yours to see who's signed up.</p>
       <div class="legend" id="legend" hidden><span><i class="dot now"></i>On call now</span><span><i class="dot later"></i>Signed up, off hours now</span><span><i class="dot"></i>Recruiting, you can still ask</span></div>
-      <div class="counties" id="counties"></div>
+      <div class="counties">
+<!-- counties:start -->
+        <a href="/hvac/atlantic-county-nj" data-cov="Atlantic"><i class="dot"></i>Atlantic</a>
+        <a href="/hvac/bergen-county-nj" data-cov="Bergen"><i class="dot"></i>Bergen</a>
+        <a href="/hvac/burlington-county-nj" data-cov="Burlington"><i class="dot"></i>Burlington</a>
+        <a href="/hvac/camden-county-nj" data-cov="Camden"><i class="dot"></i>Camden</a>
+        <a href="/hvac/cape-may-county-nj" data-cov="Cape May"><i class="dot"></i>Cape May</a>
+        <a href="/hvac/cumberland-county-nj" data-cov="Cumberland"><i class="dot"></i>Cumberland</a>
+        <a href="/hvac/essex-county-nj" data-cov="Essex"><i class="dot"></i>Essex</a>
+        <a href="/hvac/gloucester-county-nj" data-cov="Gloucester"><i class="dot"></i>Gloucester</a>
+        <a href="/hvac/hudson-county-nj" data-cov="Hudson"><i class="dot"></i>Hudson</a>
+        <a href="/hvac/hunterdon-county-nj" data-cov="Hunterdon"><i class="dot"></i>Hunterdon</a>
+        <a href="/hvac/mercer-county-nj" data-cov="Mercer"><i class="dot"></i>Mercer</a>
+        <a href="/hvac/middlesex-county-nj" data-cov="Middlesex"><i class="dot"></i>Middlesex</a>
+        <a href="/hvac/monmouth-county-nj" data-cov="Monmouth"><i class="dot"></i>Monmouth</a>
+        <a href="/hvac/morris-county-nj" data-cov="Morris"><i class="dot"></i>Morris</a>
+        <a href="/hvac/ocean-county-nj" data-cov="Ocean"><i class="dot"></i>Ocean</a>
+        <a href="/hvac/passaic-county-nj" data-cov="Passaic"><i class="dot"></i>Passaic</a>
+        <a href="/hvac/salem-county-nj" data-cov="Salem"><i class="dot"></i>Salem</a>
+        <a href="/hvac/somerset-county-nj" data-cov="Somerset"><i class="dot"></i>Somerset</a>
+        <a href="/hvac/sussex-county-nj" data-cov="Sussex"><i class="dot"></i>Sussex</a>
+        <a href="/hvac/union-county-nj" data-cov="Union"><i class="dot"></i>Union</a>
+        <a href="/hvac/warren-county-nj" data-cov="Warren"><i class="dot"></i>Warren</a>
+<!-- counties:end -->
+      </div>
     </div>
   </section>
 
-  <!-- Contractors -->
   <section class="sec band" style="margin-top:64px">
     <div class="wrap">
       <div class="stack">
@@ -88,16 +137,16 @@
     </div>
   </section>
 
-  <!-- Questions -->
   <section class="sec">
     <div class="wrap">
       <h2>Questions</h2>
       <div class="faq">
-        <details><summary>What does it cost me?</summary><p>Nothing to use <span data-brand></span>. You pay the contractor directly for the visit and any repair you approve.</p></details>
+        <details><summary>What does it cost me?</summary><p>Nothing to use <span data-brand>YourBrand</span>. You pay the contractor directly for the visit and any repair you approve.</p></details>
         <details><summary>Who are the contractors?</summary><p>Independent New Jersey HVAC companies. Each one gives us its state HVACR license number, and we check it before they can receive requests. They aren't our employees, and they set their own prices.</p></details>
         <details><summary>How fast will someone answer?</summary><p>It depends on who's free near you. Your request page shows each yes as it comes in, and after 15 minutes with no answer we show contractors you can call directly.</p></details>
-        <details><summary>What if no one can come?</summary><p>We tell you and show contractors you can call directly. Your request stays open for <span class="open-hours">12</span> hours, and we email you if someone accepts later.</p></details>
+        <details><summary>What if no one can come?</summary><p>We tell you and show contractors you can call directly. Your request stays open for 12 hours, and we email you if someone accepts later.</p></details>
         <details><summary>Who sees my phone number?</summary><p>Only the one contractor you choose. Contractors who respond see your ZIP code and the problem, not your name, number, or address.</p></details>
+        <details><summary>What is a visit fee?</summary><p>It's what the contractor charges to come out and diagnose the problem. Each contractor sets their own and you see it before you choose. Any repair is quoted on site, and you decide whether to go ahead.</p></details>
         <details><summary>Do you do plumbing or electrical?</summary><p>Not yet. We're starting with heating and cooling so we can do it well.</p></details>
       </div>
     </div>
@@ -106,47 +155,17 @@
 <div class="sticky-cta"><a class="btn" href="#book">Get help now</a></div>
 <div id="site-footer"></div>
 <script src="/assets/config.js"></script>
+<script src="/assets/nj-zips.js"></script>
 <script src="/assets/site.js"></script>
 <script>
-var $ = function (id) { return document.getElementById(id); };
-var fill = function (cls, val) { document.querySelectorAll('.' + cls).forEach(function (e) { e.textContent = val; }); };
-fill('max-offers', SITE.maxOffers); fill('window-min', SITE.windowMin); fill('free-leads', SITE.freeLeads); fill('lead-fee', SITE.leadFee); fill('open-hours', SITE.openHours);
-var opt = function (v, t) { return '<option value="' + esc(v) + '">' + esc(t || v) + '</option>'; };
-
-// Booking bar
-$('b-problem').innerHTML = Object.entries(SITE.problems).map(function (e) { return opt(e[0], e[1][0]); }).join('');
-$('b-timing').innerHTML = SITE.timings.map(function (t) { return opt(t); }).join('');
-$('b-county').insertAdjacentHTML('beforeend', SITE.counties.map(function (c) { return opt(c); }).join(''));
-var COV = null;
-function showCoverage() {
-  var c = $('b-county').value, el = $('b-cov');
-  if (!c || !COV) { el.textContent = ''; el.className = ''; return; }
-  var s = COV.counties[c];
-  el.className = s;
-  el.textContent = s === 'now' ? 'Contractors on call in ' + c + ' County now.'
-    : s === 'later' ? 'Contractors cover ' + c + ' County but none are on call right now. We\'ll show you who to call.'
-    : 'No contractor in ' + c + ' County yet. You can still send a request.';
-}
-$('b-county').addEventListener('change', showCoverage);
-$('book').addEventListener('submit', function (e) {
-  e.preventDefault();
-  var c = $('b-county').value, err = $('b-err');
-  if (!c) { err.textContent = 'Choose your county.'; err.hidden = false; $('b-county').focus(); return; }
-  location.href = '/request?p=' + encodeURIComponent($('b-problem').value) + '&county=' + encodeURIComponent(c) + '&timing=' + encodeURIComponent($('b-timing').value);
-});
-
-// Problem rows
-$('rows').innerHTML = Object.entries(SITE.problems).map(function (e) {
-  return '<a href="/request?p=' + e[0] + '"><span><b>' + esc(e[1][0]) + '</b><span>' + esc(e[1][1]) + '</span></span><span class="arrow" aria-hidden="true">&rarr;</span></a>';
-}).join('') + '<div class="soon"><span><b>Plumbing, electrical</b><span>Coming later</span></span></div>';
-
-// Counties, with live coverage once it loads
-function counties() { $('counties').innerHTML = SITE.counties.map(function (c) { return '<a href="/request?county=' + encodeURIComponent(c) + '"><i class="dot ' + (COV ? COV.counties[c] : '') + '"></i>' + esc(c) + '</a>'; }).join(''); }
-counties();
-api('/api/coverage').then(function (d) {
-  COV = d; counties(); $('legend').hidden = false; showCoverage();
-  if (d.visit_fee) $('fee-line').textContent = 'Contractors here charge $' + d.visit_fee.min + (d.visit_fee.max > d.visit_fee.min ? ' to $' + d.visit_fee.max : '') + ' to visit';
-}).catch(function () {});
+  var fill = function (cls, val) { document.querySelectorAll('.' + cls).forEach(function (e) { e.textContent = val; }); };
+  fill('window-min', SITE.windowMin); fill('free-leads', SITE.freeLeads); fill('lead-fee', SITE.leadFee);
+  // May through September, lead with cooling instead of heat.
+  var month = new Date().getMonth();
+  if (month >= 4 && month <= 8) {
+    document.getElementById('hero-h1').textContent = 'No AC? See who can come today.';
+    document.getElementById('b-problem').value = 'no-cooling';
+  }
 </script>
 </body>
 </html>

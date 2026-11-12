@@ -3,10 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- seo:start -->
+<title>Job request | YourBrand</title>
 <meta name="robots" content="noindex">
-<title>Job request</title>
+<!-- seo:end -->
+<!-- head:start -->
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#FFC72C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
+<!-- head:end -->
 </head>
 <body>
 <div id="site-header"></div>
@@ -15,47 +23,62 @@
 <script src="/assets/config.js"></script>
 <script src="/assets/site.js"></script>
 <script>
-var app = document.getElementById('app'), t = new URLSearchParams(location.search).get('t'), D = null, poll;
+// The page a contractor opens from a job alert. Tapping an arrival time IS the yes: one tap, no form.
+var app = document.getElementById('app'), t = new URLSearchParams(location.search).get('t'), D = null, poll, editingFee = false, fee = null, busy = false;
+var tel = function (p) { return 'tel:' + String(p || '').replace(/[^\d+]/g, ''); };
+
 function render(msg) {
-  var r = D.request, s = D.state, c = D.customer;
-  var h = '<div><h1>' + SITE.problems[r.problem][0] + '</h1><p class="sub">Request for ' + esc(D.company) + '</p></div>' +
-    '<div class="card"><dl class="kv"><dt>Where</dt><dd>' + esc(r.county) + ' County, ZIP ' + esc(r.zip) + '</dd><dt>When</dt><dd>' + esc(r.timing) + '</dd><dt>System</dt><dd>' + esc(r.system) + '</dd>' + (r.note ? '<dt>Notes</dt><dd>' + esc(r.note) + '</dd>' : '') +
-    '<dt>Customer</dt><dd>' + (c ? esc(c.name) + '<br>' + esc(c.phone) + '<br>' + esc(c.email) + '<br>' + esc(c.address) + ', ' + esc(r.zip) : 'Shared if they choose you') + '</dd></dl>';
+  var r = D.request, s = D.state, c = D.customer, h = '';
+  if (fee == null) fee = D.mine.visit_fee;
+  h += '<div><p class="eyebrow">' + esc(r.county) + ' County · ZIP ' + esc(r.zip) + '</p><h1>' + esc(SITE.problems[r.problem][0]) + '</h1>' +
+    '<p class="sub">' + esc(r.timing) + ' · ' + esc(r.system) + '</p></div>';
+  if (r.note) h += '<div class="card"><b>Customer\'s note</b><p>' + esc(r.note) + '</p></div>';
+
   if (s === 'open' || s === 'declined') {
-    h += (s === 'declined' ? '<div class="notice warn"><b>You passed on this one.</b> No charge and no penalty. Changed your mind? You can still say yes below.</div>' : '') +
-      '<div class="row"><div><label for="arrival">When can you arrive?</label><select id="arrival">' + SITE.arrivals.map(function (a) { return '<option>' + a + '</option>'; }).join('') + '</select></div>' +
-      '<div><label for="fee">Your visit fee ($)</label><input type="number" id="fee" min="0" max="1000" step="1" value="' + esc(D.mine.visit_fee) + '"></div></div>' +
-      '<p class="small sub">' + (D.free_leads_left > 0 ? 'You have ' + D.free_leads_left + ' free lead' + (D.free_leads_left === 1 ? '' : 's') + ' left, so this one costs nothing if you\'re chosen.' : 'You pay $' + SITE.leadFee + ' only if the customer chooses you.') + ' Saying no never counts against you.</p>' +
+    if (s === 'declined') h += '<div class="notice warn"><b>You passed on this one.</b> No charge and no penalty. Changed your mind? Tap a time below.</div>';
+    h += '<h2 class="ask">When can you get there?</h2><p class="sub">Tap one. That sends your yes to the customer.</p>' +
+      '<div class="arrive">' + SITE.arrivals.map(function (a) { return '<button class="btn" type="button" data-arrival="' + esc(a) + '"' + (busy ? ' disabled' : '') + '>' + esc(a) + '</button>'; }).join('') + '</div>' +
+      (editingFee
+        ? '<div class="feeedit"><label for="fee">Visit fee for this job ($)</label><input type="number" id="fee" min="0" max="1000" step="1" inputmode="numeric" value="' + esc(fee) + '"><p class="small sub">Tap a time above to send it with this fee.</p></div>'
+        : '<p class="feeline">Your visit fee: <b>$' + esc(fee) + '</b> <button class="linkbtn" type="button" data-act="fee">Change for this job</button></p>') +
+      '<p class="small sub">' + (D.free_leads_left > 0 ? 'Free lead: you have ' + D.free_leads_left + ' left, so this costs nothing if you\'re chosen.' : 'You pay $' + SITE.leadFee + ' only if the customer chooses you.') + ' The customer\'s name and address are shared once they pick you.</p>' +
       '<p class="err" id="err" role="alert" hidden></p>' +
-      '<div class="btns"><button class="btn" type="button" data-act="accept">Yes, I can take it</button>' + (s === 'open' ? '<button class="btn ghost" type="button" data-act="decline">Can\'t take this one</button>' : '') + '</div>';
+      (s === 'open' ? '<div><button class="btn ghost" type="button" data-act="decline">Can\'t take this one</button></div>' : '');
   } else if (s === 'accepted') {
-    h += '<div class="notice warn"><b>You said yes.</b> The customer sees: ' + esc(D.mine.arrival) + ', $' + esc(D.mine.visit_fee) + ' visit fee. We\'ll email you the moment they choose. This page updates too.</div>' +
+    h += '<div class="notice good"><b>Sent. The customer sees: ' + esc(D.mine.arrival) + ', $' + esc(D.mine.visit_fee) + ' visit fee.</b> We\'ll email you the moment they choose. This page updates too.</div>' +
       '<div><button class="btn ghost sm" type="button" data-act="decline">I can\'t make it after all</button></div>';
   } else if (s === 'chosen') {
-    h += '<div class="notice good"><b>The customer chose you.</b> Call them now to confirm your arrival: ' + esc(D.mine.arrival) + ', $' + esc(D.mine.visit_fee) + ' visit fee. ' + (D.lead_fee ? 'Lead fee for this job: $' + esc(D.lead_fee) + '.' : 'This lead is free.') + '</div>';
+    h += '<div class="notice good"><b>The customer chose you.</b> Call them now to confirm: ' + esc(D.mine.arrival) + ', $' + esc(D.mine.visit_fee) + ' visit fee.</div>' +
+      '<div class="card"><h2>' + esc(c.name) + '</h2><dl class="kv"><dt>Phone</dt><dd><a href="' + tel(c.phone) + '">' + esc(c.phone) + '</a></dd><dt>Address</dt><dd>' + esc(c.address) + ', ' + esc(r.zip) + '</dd><dt>Email</dt><dd>' + esc(c.email) + '</dd></dl>' +
+      '<div><a class="btn" href="' + tel(c.phone) + '">Call ' + esc(c.name) + '</a></div></div>' +
+      '<p class="small sub">' + (D.lead_fee ? 'Lead fee for this job: $' + esc(D.lead_fee) + '.' : 'This lead was free.') + '</p>';
   } else if (s === 'filled') {
-    h += '<div class="notice warn"><b>Filled by another contractor.</b> No charge. Thanks for answering.</div>';
+    h += '<div class="notice warn"><b>The customer went with another contractor.</b> No charge. Thanks for answering.</div>';
   } else if (s === 'full') {
     h += '<div class="notice warn"><b>This request already has ' + SITE.maxOffers + ' contractors.</b> We cap it so customers aren\'t overwhelmed. No charge.</div>';
   } else {
     h += '<div class="notice warn"><b>This request has closed.</b> No charge.</div>';
   }
-  app.innerHTML = h + '</div>';
+  if (D.manage) h += '<p class="small"><a href="/pro?t=' + encodeURIComponent(D.manage) + '">Busy? Pause alerts or change your settings</a></p>';
+  app.innerHTML = h;
   if (msg) { var e = document.getElementById('err'); if (e) { e.textContent = msg; e.hidden = false; } }
 }
 async function load() {
-  try { D = await api('/api/alerts?t=' + encodeURIComponent(t || '')); render(); if (['chosen', 'filled', 'closed'].includes(D.state)) clearInterval(poll); }
+  try { D = await api('/api/alerts?t=' + encodeURIComponent(t || '')); if (!busy) render(); if (['chosen', 'filled', 'closed'].includes(D.state)) clearInterval(poll); }
   catch (e) { if (!D) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div>'; clearInterval(poll); } }
 }
+app.addEventListener('input', function (e) { if (e.target.id === 'fee') fee = e.target.value; });
 app.addEventListener('click', async function (e) {
-  var b = e.target.closest('[data-act]'); if (!b) return;
-  var body = { t: t, action: b.dataset.act };
-  if (body.action === 'accept') { body.arrival = document.getElementById('arrival').value; body.visit_fee = document.getElementById('fee').value; }
-  b.disabled = true;
-  try { D = await api('/api/alerts', body); render(); }
-  catch (x) { try { D = await api('/api/alerts?t=' + encodeURIComponent(t)); } catch (y) {} render(x.message); }
+  var a = e.target.closest('[data-arrival]'), act = e.target.closest('[data-act]');
+  if (act && act.dataset.act === 'fee') { editingFee = true; render(); var f = document.getElementById('fee'); if (f) f.focus(); return; }
+  if (!a && !(act && act.dataset.act === 'decline')) return;
+  if (busy) return;
+  var body = a ? { t: t, action: 'accept', arrival: a.dataset.arrival, visit_fee: fee } : { t: t, action: 'decline' };
+  busy = true; if (a) { a.textContent = 'Sending...'; } document.querySelectorAll('#app button').forEach(function (b) { b.disabled = true; });
+  try { D = await api('/api/alerts', body); busy = false; editingFee = false; render(); if (a) track('contractor_accepted'); window.scrollTo(0, 0); }
+  catch (x) { busy = false; try { D = await api('/api/alerts?t=' + encodeURIComponent(t)); } catch (y) {} render(x.message); }
 });
-// Refresh while waiting on the customer; don't redraw the form while someone is filling it in.
+// Refresh while waiting on the customer. The open form is left alone so a tap never lands on a redrawn button.
 poll = setInterval(function () { if (D && D.state === 'accepted') load(); }, 5000);
 load();
 </script>

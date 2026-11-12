@@ -3,16 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Request emergency HVAC help</title>
-<meta name="description" content="Tell us what's wrong and we'll alert licensed New Jersey HVAC contractors who can come.">
+<!-- seo:start -->
+<title>Request Emergency HVAC Help in New Jersey | YourBrand</title>
+<meta name="description" content="Tell us what&#39;s wrong and we&#39;ll alert licensed New Jersey HVAC contractors who can come. Takes about a minute.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="YourBrand">
+<meta property="og:title" content="Request Emergency HVAC Help in New Jersey">
+<meta property="og:description" content="Tell us what&#39;s wrong and we&#39;ll alert licensed New Jersey HVAC contractors who can come. Takes about a minute.">
+<meta name="twitter:card" content="summary_large_image">
+<!-- seo:end -->
+<!-- head:start -->
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#FFC72C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
+<!-- head:end -->
 </head>
 <body>
 <div id="site-header"></div>
 <main class="page"><div class="wrap"><div class="narrow" id="app"></div></div></main>
 <div id="site-footer"></div>
 <script src="/assets/config.js"></script>
+<script src="/assets/nj-zips.js"></script>
 <script src="/assets/site.js"></script>
 <script>
 var app = document.getElementById('app');
@@ -48,10 +62,17 @@ function showForm() {
     '<label class="check" for="consent"><input type="checkbox" id="consent"><span>' + esc(SITE.consent.homeowner) + ' See our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</span></label>' +
     '<p class="err" id="err" role="alert" hidden></p>' +
     '<div class="btns"><button class="btn" type="submit" id="go">Find who can come</button><button class="btn ghost" type="button" data-back>Back</button></div></form>';
-  // Carry over anything chosen on the home page.
+  // Bring back anything typed earlier in this tab, then anything chosen on the page they came from.
+  restoreDraft();
   if (SITE.counties.indexOf(Q.get('county')) > -1) document.getElementById('county').value = Q.get('county');
   if (SITE.timings.indexOf(Q.get('timing')) > -1) document.getElementById('timing').value = Q.get('timing');
+  if (/^\d{5}$/.test(Q.get('zip') || '')) { document.getElementById('zip').value = Q.get('zip'); zipToCounty(); }
 }
+var FIELDS = ['zip', 'county', 'timing', 'system', 'note', 'name', 'phone', 'email', 'address'];
+function zipToCounty() { var hit = window.NJ_ZIPS && window.NJ_ZIPS[document.getElementById('zip').value.trim()]; if (hit) document.getElementById('county').value = SITE.counties[hit[0]]; }
+function saveDraft() { try { var d = {}; FIELDS.forEach(function (k) { d[k] = document.getElementById(k).value; }); sessionStorage.setItem('draft', JSON.stringify(d)); } catch (e) {} }
+function restoreDraft() { try { var d = JSON.parse(sessionStorage.getItem('draft') || '{}'); FIELDS.forEach(function (k) { if (d[k]) document.getElementById(k).value = d[k]; }); } catch (e) {} }
+app.addEventListener('input', function (e) { if (!document.getElementById('f')) return; if (e.target.id === 'zip') zipToCounty(); saveDraft(); });
 app.addEventListener('click', function (e) {
   var t = e.target.closest('[data-p]');
   if (t) { if (t.dataset.p === 'gas') return showGas(); problem = t.dataset.p; showForm(); window.scrollTo(0, 0); return; }
@@ -62,7 +83,9 @@ app.addEventListener('submit', async function (e) {
   var v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
   err.hidden = true; go.disabled = true; go.textContent = 'Sending...';
   try {
-    var out = await api('/api/requests', { problem: problem, zip: v('zip'), county: v('county'), timing: v('timing'), system: v('system'), note: v('note'), name: v('name'), phone: v('phone'), email: v('email'), address: v('address'), website: v('website'), consent: document.getElementById('consent').checked });
+    var out = await api('/api/requests', { problem: problem, zip: v('zip'), county: v('county'), timing: v('timing'), system: v('system'), note: v('note'), name: v('name'), phone: v('phone'), email: v('email'), address: v('address'), website: v('website'), source: siteSource(), consent: document.getElementById('consent').checked });
+    try { sessionStorage.removeItem('draft'); } catch (x) {}
+    rememberRequest(out.token); track('request_submitted');
     location.href = '/status?t=' + encodeURIComponent(out.token);
   } catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Find who can come'; }
 });

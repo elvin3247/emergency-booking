@@ -7,10 +7,13 @@ Homeowners request emergency HVAC help, licensed contractors who can come say ye
 | Page | What it does |
 | --- | --- |
 | `/` | Home page: start a request, services, live county coverage (from `/api/coverage`) |
+| `/hvac`, `/hvac/<county>-county-nj` | Service areas and one page per county: booking bar, live contractor list, towns and ZIP codes |
+| `/help`, `/help/<problem>` | Troubleshooting guides ("quick checks") with a booking bar |
 | `/request` | Homeowner picks a problem and enters details |
 | `/status?t=...` | Homeowner's private page: who said yes, choose one, backups if no one confirms |
 | `/respond?t=...` | Contractor's private page from the alert email: accept or pass |
-| `/contractors` | Contractor sign-up |
+| `/contractors` | Contractor sign-up, step 1 (name, contact, license, counties) |
+| `/pro?t=...` | Contractor's private page from their emails: finish setup (visit fee, business phone), pause or resume alerts, change settings |
 | `/terms`, `/privacy` | Placeholders. Replace with lawyer-reviewed versions before launch. |
 
 ## Set up (about 30 minutes)
@@ -22,10 +25,20 @@ Homeowners request emergency HVAC help, licensed contractors who can come say ye
 
 ## Running it day to day
 
+- **Contractor setup:** a contractor gets no requests until they've added a visit fee and business phone (step 2) and you've approved them. They can pause themselves from the link in any alert; `paused_until` shows it in Supabase.
 - **Approve contractors:** each sign-up emails `ADMIN_EMAIL`. Check the license with the NJ HVACR board, then in Supabase > Table Editor > `contractors`, change `status` from `pending` to `approved`. Only approved contractors get alerts. Set `paused` to stop alerts.
 - **Requests:** you get an email for every request. The subject starts with `COVERAGE GAP` when no approved contractor covers that county at that hour.
 - **Lead fees:** each match emails you the fee owed ($0 while a contractor has free leads left). The amount is saved in `alerts.lead_fee`. Billing is manual for now.
 - **Brand name, lead fee, time limits, problem list:** all in `public/assets/config.js`.
+
+## Search and marketing
+
+- **Generated pages:** the county pages, guides, `robots.txt`, `sitemap.xml`, and the title, description, share, and structured-data tags on every page come from `npm run build`. Run it after changing `public/assets/config.js` or `scripts/content.js`, then commit the result. Vercel needs no build step.
+- **Before launch:** set `brand` and `siteUrl` in `public/assets/config.js` and run `npm run build`. Without `siteUrl` there is no sitemap and no canonical links. Then submit `/sitemap.xml` in Google Search Console.
+- **Guide wording:** edit `scripts/content.js`.
+- **Tracking where requests come from:** give each referral partner a link like `https://yoursite.com/?ref=agent-smith`. Ad links with `utm_source` work too. The source is saved in the `source` column on `requests` and `contractors` and shown in your admin emails. If you created the database before this was added, run `supabase/schema.sql` again; it is safe to rerun.
+- **Page views:** turn on Web Analytics for the project in Vercel. To remove it, set `analytics: ''` in the config.
+- **ZIP codes:** `scripts/nj-zips.json` comes from GeoNames (geonames.org), CC BY 4.0. The footer credit satisfies the license, so keep it.
 
 ## Try it locally without any accounts
 

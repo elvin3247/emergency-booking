@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "engines": { "node": ">=18" },
   "scripts": {
+    "build": "node scripts/build.js",
     "dev": "STORE=memory AUTO_APPROVE=1 ADMIN_EMAIL=admin@example.com node dev-server.js",
     "test": "STORE=memory AUTO_APPROVE=1 node test/flow.test.js"
   },
