@@ -510,3 +510,7 @@ body.home .hero .wrap{padding-block:120px 72px}
 .tri:target{outline:3px solid var(--accent);outline-offset:2px}
 .guide-map{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center}
 @media (max-width:860px){.hx.guide-map{grid-template-columns:1fr}.guide-map .hx-text{display:block}}
+
+/* Home hero fills the first screen, with its content centered top to bottom. svh keeps phones from jumping when the address bar hides. */
+body.home .hero{min-height:100vh;min-height:100svh;display:flex;align-items:center}
+body.home .hero>.wrap{width:100%}
