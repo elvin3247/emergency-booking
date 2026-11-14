@@ -76,7 +76,7 @@
   if (mb) mb.addEventListener('click', function () { var m = byId('menu'), open = m.hidden; m.hidden = !open; mb.setAttribute('aria-expanded', String(open)); mb.textContent = open ? 'Close' : 'Menu'; });
   var ftr = byId('site-footer');
   if (ftr) ftr.innerHTML = '<footer class="ftr"><div class="wrap"><span>' + esc(S.brand) + ' connects New Jersey homeowners with independent, licensed local pros. We don\'t perform the work.</span>' +
-    '<nav aria-label="Footer">' + liveTrades.map(function (t) { return '<a href="/' + S.trades[t].slug + '">' + esc(S.trades[t].name) + ' by county</a>'; }).join('') + '<a href="/help">Quick checks</a><a href="/find">Find my request</a><a href="/contractors">For pros</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>' +
+    '<nav aria-label="Footer">' + liveTrades.map(function (t) { return '<a href="/' + S.trades[t].slug + '">' + esc(S.trades[t].name) + ' by county</a>'; }).join('') + (S.services['water-heater'] && S.services['water-heater'].live ? '<a href="/water-heater">Water heaters by county</a>' : '') + '<a href="/whats-wrong">What\'s wrong?</a><a href="/help">Quick checks</a><a href="/find">Find my request</a><a href="/contractors">For pros</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>' +
     '<span class="credit">ZIP code data from <a href="https://www.geonames.org/" rel="noopener">GeoNames</a>, CC BY 4.0.</span></div></footer>';
   document.querySelectorAll('[data-brand]').forEach(function (el) { el.textContent = S.brand; });
   if (document.title.indexOf(S.brand) < 0) document.title = document.title + ' | ' + S.brand;
@@ -178,13 +178,13 @@ window.uploadPhotos = async function (token, files, max) {
 };
 window.photoGrid = function (urls) { return urls && urls.length ? '<div class="photos">' + urls.map(function (u, i) { return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="Photo ' + (i + 1) + ' from the homeowner" loading="lazy"></a>'; }).join('') + '</div>' : ''; };
 
-// Home: "Where in the house?" Hovering or focusing a pin or a problem lights up both, with a label over the pin.
-(function () {
-  var svg = document.querySelector('.house'), flag = document.getElementById('hx-flag');
+// "Where in the house?" (home page and /whats-wrong): hovering or focusing a pin or a problem lights up both, with a label over the pin.
+document.querySelectorAll('[data-house]').forEach(function (box) {
+  var svg = box.querySelector('.house'), flag = box.querySelector('.flag');
   if (!svg || !flag) return;
   function on(k, v) {
-    document.querySelectorAll('#services [data-k="' + k + '"]').forEach(function (e) { e.classList.toggle('on', v); });
-    var pin = svg.querySelector('.pin[data-k="' + k + '"]'), name = document.querySelector('.hlist [data-k="' + k + '"] b');
+    box.querySelectorAll('[data-k="' + k + '"]').forEach(function (e) { e.classList.toggle('on', v); });
+    var pin = svg.querySelector('.pin[data-k="' + k + '"]'), name = box.querySelector('[data-k="' + k + '"] b');
     if (v && pin && name) {
       var r = svg.getBoundingClientRect(), pr = svg.parentNode.getBoundingClientRect(), sc = r.width / 600;
       flag.textContent = name.textContent;
@@ -193,9 +193,9 @@ window.photoGrid = function (urls) { return urls && urls.length ? '<div class="p
       flag.classList.add('show');
     } else flag.classList.remove('show');
   }
-  document.querySelectorAll('#services [data-k]').forEach(function (e) {
+  box.querySelectorAll('[data-k]').forEach(function (e) {
     var k = e.getAttribute('data-k');
     ['mouseenter', 'focus'].forEach(function (ev) { e.addEventListener(ev, function () { on(k, true); }); });
     ['mouseleave', 'blur'].forEach(function (ev) { e.addEventListener(ev, function () { on(k, false); }); });
   });
-})();
+});

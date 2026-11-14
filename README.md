@@ -8,6 +8,8 @@ Homeowners request emergency help (heating, cooling, plumbing, water heaters, an
 | --- | --- |
 | `/` | Home page: start a request, services, live county coverage (from `/api/coverage`) |
 | `/hvac`, `/plumbing`, `/<trade>/<county>-county-nj` | For each trade that is switched on, an index and one page per county: booking bar, live contractor list, towns and ZIP codes |
+| `/water-heater`, `/water-heater/<county>-county-nj` | Water heater pages for each county: problems, what to do first, live coverage from plumbers |
+| `/whats-wrong` | Room-by-room guide: every problem, when it can't wait, and what to do first, with the house drawing |
 | `/help`, `/help/<problem>` | Troubleshooting guides ("quick checks") with a booking bar |
 | `/request` | Homeowner picks a service, then a problem, and enters details |
 | `/status?t=...` | Homeowner's private page: who said yes, choose one, backups if no one confirms |
@@ -15,7 +17,8 @@ Homeowners request emergency help (heating, cooling, plumbing, water heaters, an
 | `/contractors` | Contractor sign-up, step 1 (name, contact, license, counties) |
 | `/pro?t=...` | Contractor's private page from their emails: finish setup (visit fee, business phone), pause or resume alerts, change settings |
 | `/terms`, `/privacy` | Plain-language drafts with blanks in [brackets]. A lawyer needs to finish them before launch. |
-| `/admin` | Your page: approve contractors, see requests and coverage gaps, test goals, and lead fees owed. Locked by `ADMIN_KEY`. |
+| `/admin` | Your page: approve contractors, see requests and coverage gaps, test goals, lead fees, the launch checklist, and recruiting. Locked by `ADMIN_KEY`. |
+| `/unsubscribe?inv=...` | The "don't email me again" link in recruiting emails |
 
 ## Set up (about 30 minutes)
 
@@ -23,7 +26,8 @@ Homeowners request emergency help (heating, cooling, plumbing, water heaters, an
 2. **Resend:** verify a sending domain and create an API key.
 3. **Vercel:** import this repo (framework preset "Other"). Add the variables from `.env.example` under Settings > Environment Variables, then redeploy.
 4. Set `SITE_URL` to the live address. Links in emails use it. If it's missing, emails fall back to Vercel's own address for the project.
-5. When you pick a name and domain, set `brand` and `siteUrl` in `public/assets/config.js`, run `npm run build`, and commit. That turns on the sitemap, canonical links, and share previews.
+5. When you pick a name and domain, set `brand` and `siteUrl` in `public/assets/config.js`, run `npm run build`, and commit. That turns on the sitemap, canonical links, and share previews. (If Vercel runs the build, `SITE_URL` alone also works.)
+6. Open `/admin`, go to **Launch checklist**, and fix anything marked "Fix this".
 
 ## Running it day to day
 
@@ -45,20 +49,45 @@ Homeowners request emergency help (heating, cooling, plumbing, water heaters, an
 ## Try it locally without any accounts
 
 ```
-npm install
-npm run dev     # http://localhost:3000, data in memory, emails printed in the terminal
+npm install     # once, after cloning
+npm run dev     # http://localhost:3000, test data in memory, emails and texts printed in the terminal
 npm test        # checks the whole booking flow
 ```
 
-In this mode contractors are approved automatically and the links from each "email" are printed in the terminal.
+In this mode contractors are approved automatically, the links from each "email" are printed in the terminal, and the admin page
+(`/admin`) opens with the key `demo`. Press Ctrl+C to stop. Works the same on Mac and Windows.
+
+- Edited HTML, CSS, or JS in `public/`? Just refresh the browser.
+- Edited `public/assets/config.js`, `scripts/content.js`, `scripts/triage.js`, or `scripts/build.js`? Run `npm run build`, then refresh.
+- Publish: `git add -A`, `git commit -m "what changed"`, `git push`. Vercel deploys `main` on every push. Push a different branch to get a private preview link first.
 
 ## Not built yet
 
-- Text alerts. Email is the only channel until a texting number is approved.
 - Charging contractors automatically.
-- An admin screen. Use the Supabase table editor.
-- ZIP to county lookup. Homeowners pick their county.
-- Rate limiting beyond a hidden spam-trap field.
+- Text messages to homeowners (pros only for now).
+
+## Launch checklist (admin page)
+
+The "Launch checklist" tab checks everything the live site depends on and says how to fix what isn't ready: brand name, web address and sitemap,
+mailing address, Supabase tables and the photo bucket, the Resend sending domain, Twilio, `CRON_SECRET` and when the daily job last ran, and
+how many counties have live pros. "Prove it works" sends a real test email, a test text, and a sample job alert so you can see them arrive.
+
+## Text alerts for pros
+
+- Pros opt in with a separate box at sign-up, or from their settings page. Email always goes too, so a missed text never means a missed job.
+- Texted: new requests, "still open" reminders, "you were chosen" (with the customer's number), confirm reminders, switched pros, and cancellations.
+- Texting stays off until `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_MESSAGING_SERVICE_SID` (or `TWILIO_FROM`) are set in Vercel.
+- **Register first.** US carriers block business texts from unregistered senders. In Twilio, register a 10DLC campaign (brand plus a "customer care / account notifications" use case) or verify a toll-free number. They'll ask for: your opt-in wording (it's `consent.sms` in `public/assets/config.js`), sample messages (see `lib/emails.js`, the `text:` lines), and your privacy policy link. Approval can take days to a few weeks.
+- STOP and HELP replies are handled by Twilio's messaging service. If a text fails because the person replied STOP or the number isn't a mobile, the site turns texts off for that pro and shows why on their settings page.
+- Run `supabase/schema.sql` again to add the new columns.
+
+## Recruiting (admin page)
+
+- **Where you need pros:** a county-by-trade map of live pros. Red is nobody, yellow is 1 or 2, green is 3 or more. It also shows applicants waiting on you, companies on your list, and requests in the last 30 days that had nobody to alert. Tap a box to filter your list to that county and trade.
+- **Add a list:** paste rows from a spreadsheet or pick a CSV file. Columns are matched by name (Company, Contact, Email, Phone, Town, County, ZIP, Trade or Category, Website, License, Notes). County comes from the county, ZIP, or town; trade from words like HVAC or plumbing. Duplicates and companies already signed up are skipped.
+- **Invite:** pick companies and send up to 100 at a time, with an optional personal line. Each email has a private link, so you see who clicked and who applied. Nobody is invited more than once a week or more than 3 times, and anyone who uses the "don't email me again" link is never emailed again.
+- **The law:** recruiting emails to companies that haven't signed up need your postal address and an opt-out (CAN-SPAM). The opt-out is built in. Set `MAILING_ADDRESS` in Vercel (or `mailingAddress` in config.js); bulk invites stay off until you do.
+- **After a call:** "Invite one after a call" sends the sign-up link and adds them to the list, so it's tracked too.
 
 ## Services and trades
 

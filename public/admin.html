@@ -23,13 +23,15 @@
 <div id="site-footer"></div>
 <script src="/assets/config.js"></script>
 <script src="/assets/site.js"></script>
+<script src="/assets/nj-zips.js"></script>
 <script>
 // The owner's page: approve contractors, watch requests, and track lead fees. Locked by the ADMIN_KEY you set in Vercel.
 var app = document.getElementById('app'), D = null, tab = 'todo', toastT, editing = null, removing = null;
+var SETUP = null, REC = null, FIL = { trade: '', county: '', stage: 'open', q: '' }, picked = {}, IMPORT = null, NOTE = '';
 var KEY = ''; try { KEY = sessionStorage.getItem('adminKey') || ''; } catch (e) {}
 function toast(m) { var el = document.getElementById('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { el.hidden = true; }, 3500); }
-async function call(body) {
-  var res = await fetch('/api/admin', { method: body ? 'POST' : 'GET', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY }, body: body ? JSON.stringify(body) : undefined });
+async function call(body, qs) {
+  var res = await fetch('/api/admin' + (qs || ''), { method: body ? 'POST' : 'GET', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY }, body: body ? JSON.stringify(body) : undefined });
   var data = await res.json().catch(function () { return {}; });
   if (!res.ok) throw Object.assign(new Error(data.error || 'Something went wrong.'), { status: res.status });
   return data;
@@ -95,6 +97,163 @@ var feeRow = function (f) {
     : f.lead_fee ? '<button class="btn sm" type="button" data-fee="paid" data-id="' + f.id + '">Mark paid</button><button class="btn sm ghost" type="button" data-fee="waive" data-id="' + f.id + '">Waive</button>' : '';
   return '<tr><td class="num">' + when(f.at) + '</td><td><b>' + esc(f.company) + '</b></td><td class="num">' + money(f.lead_fee) + '</td><td>' + esc(what) + '</td><td>' + status + '</td><td><div class="acts">' + acts + '</div></td></tr>';
 };
+// ---- Launch checklist: every outside service the site needs, checked live ----
+var STATE = { ok: ['ok', 'Ready'], warn: ['wait', 'Check'], bad: ['bad', 'Fix this'] };
+function setupTab() {
+  if (!SETUP) { loadSetup(); return '<p class="sub">Checking your services. This takes a few seconds...</p>'; }
+  var groups = [], h = '';
+  SETUP.checks.forEach(function (c) { if (groups.indexOf(c.group) < 0) groups.push(c.group); });
+  h += '<div class="split"><p class="sub">' + (SETUP.bad ? '<b>' + SETUP.bad + ' to fix</b> before real customers use the site. ' : '<b>Nothing blocking launch.</b> ') + SETUP.warn + ' to check, ' + SETUP.ok + ' ready. Checked ' + when(SETUP.checked_at) + '.</p><button class="btn sm ghost" type="button" data-recheck>Check again</button></div>';
+  groups.forEach(function (g) {
+    h += '<h2>' + esc(g) + '</h2><div class="checklist">' + SETUP.checks.filter(function (c) { return c.group === g; }).map(function (c) {
+      return '<div class="chk ' + c.state + '"><span class="pill ' + STATE[c.state][0] + '">' + STATE[c.state][1] + '</span><div><b>' + esc(c.label) + '</b><p>' + esc(c.detail) + '</p>' + (c.fix ? '<p class="fix">' + esc(c.fix) + '</p>' : '') + '</div></div>';
+    }).join('') + '</div>';
+  });
+  h += '<h2>Prove it works</h2><p class="sub">Checks can pass while mail still lands in spam. These send real messages so you can see them arrive.</p><div class="testgrid">' +
+    '<form class="card" id="t-email"><h3>Send a test email</h3><div><label for="te">To</label><input type="email" id="te" value="' + esc(SETUP.test_to.email) + '"></div><div><button class="btn sm" type="submit">Send test email</button></div></form>' +
+    '<form class="card" id="t-text"><h3>Send a test text</h3><div><label for="tt">Mobile number</label><input type="tel" id="tt" placeholder="(908) 555-0123"></div><div><button class="btn sm" type="submit">Send test text</button></div></form>' +
+    '<form class="card" id="t-alert"><h3>Send me a sample job alert</h3><p class="small sub">Exactly what a pro gets for a new request, with a made-up job. Nothing is saved.</p><div><label for="ae">Email</label><input type="email" id="ae" value="' + esc(SETUP.test_to.email) + '"></div><div><label for="ap">Mobile for the text version (optional)</label><input type="tel" id="ap"></div><div><button class="btn sm" type="submit">Send sample alert</button></div></form></div>';
+  return h;
+}
+async function loadSetup() {
+  try { SETUP = await call(null, '?view=setup'); } catch (x) { SETUP = { checks: [{ group: 'Checklist', label: 'Could not run the checks', state: 'bad', detail: x.message, fix: '' }], bad: 1, warn: 0, ok: 0, checked_at: new Date().toISOString(), test_to: { email: '' } }; }
+  if (tab === 'setup' || tab === 'todo') render();
+}
+
+// ---- Recruiting: where you're thin, your list of companies, and invites ----
+var STAGE = { new: ['plain', 'Not invited'], invited: ['wait', 'Invited'], clicked: ['info', 'Clicked the link'], applied: ['ok', 'Applied'], approved: ['ok', 'Approved'], live: ['ok', 'Live'], not_interested: ['plain', 'Not interested'], unsubscribed: ['bad', 'Asked for no emails'] };
+var tname = function (t) { return (SITE.trades[t] || { name: t }).name; };
+function shown() {
+  return REC.prospects.filter(function (p) {
+    if (FIL.trade && p.trades.indexOf(FIL.trade) < 0) return false;
+    if (FIL.county && p.counties.indexOf(FIL.county) < 0) return false;
+    if (FIL.stage === 'open' && ['new', 'invited', 'clicked'].indexOf(p.stage) < 0) return false;
+    if (FIL.stage === 'ready' && p.blocked) return false;
+    if (FIL.stage && ['open', 'ready'].indexOf(FIL.stage) < 0 && p.stage !== FIL.stage) return false;
+    if (FIL.q) { var q = FIL.q.toLowerCase(); if ([p.company, p.contact, p.email, p.phone, p.town, p.notes].join(' ').toLowerCase().indexOf(q) < 0) return false; }
+    return true;
+  });
+}
+function cell(county, t) {
+  var x = REC.supply[county][t], tone = x.live >= 3 ? 'ok' : x.live ? 'thin' : 'none', on = FIL.county === county && FIL.trade === t;
+  return '<td><button type="button" class="cell ' + tone + (on ? ' on' : '') + '" data-cell="' + esc(county) + '|' + t + '" aria-label="' + esc(county) + ', ' + esc(tname(t)) + ': ' + x.live + ' live">' +
+    '<b>' + x.live + '</b><span>' + (x.pending ? x.pending + ' waiting, ' : '') + x.prospects + ' to invite' + (x.gaps ? '</span><em>' + x.gaps + ' missed</em>' : '</span>') + '</button></td>';
+}
+function recruitTab() {
+  if (!REC) { loadRecruit(); return '<p class="sub">Loading your recruiting list...</p>'; }
+  var T = REC.totals, list = shown(), sel = list.filter(function (p) { return picked[p.id]; }), ready = sel.filter(function (p) { return !p.blocked; });
+  var h = '<div class="kpis"><div><b>' + T.prospects + '</b><span>companies on your list</span></div><div><b>' + T.invited + '</b><span>invited</span></div><div><b>' + T.clicked + '</b><span>clicked the link</span></div><div><b>' + T.applied + '</b><span>applied</span></div><div><b>' + T.live + '</b><span>now live</span></div></div>';
+  // Supply map
+  h += '<h2>Where you need pros</h2><p class="sub">Live pros in each county, by trade. Aim for at least 3 so every homeowner gets choices. Red means nobody, so requests there go unanswered. Tap a box to see who you can invite there.</p>' +
+    '<div class="tablewrap"><table class="list supply"><thead><tr><th scope="col">County</th>' + REC.trades.map(function (t) { return '<th scope="col">' + esc(tname(t)) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    SITE.counties.map(function (c) { return '<tr><th scope="row">' + esc(c) + '</th>' + REC.trades.map(function (t) { return cell(c, t); }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' +
+    '<p class="small sub">"Waiting" = applied but not approved or not set up yet. "Missed" = requests in the last 30 days with nobody to alert.</p>';
+  // Add companies
+  h += '<h2>Add companies to invite</h2><div class="testgrid">' + importCard() +
+    '<form class="card" id="invite"><h3>Invite one after a call</h3><p class="small sub">They get a sign-up link with their email filled in. It\'s added to your list so you can see if they sign up.</p>' +
+    '<div class="row"><div><label for="iname">Their name or company</label><input type="text" id="iname"></div><div><label for="iemail">Their email</label><input type="email" id="iemail"></div></div>' +
+    '<div class="row"><div><label for="itrade">Trade</label><select id="itrade">' + REC.trades.map(function (t) { return '<option value="' + t + '">' + esc(tname(t)) + '</option>'; }).join('') + '</select></div><div><label for="icounty">County</label><select id="icounty"><option value="">Not sure</option>' + SITE.counties.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select></div></div>' +
+    '<div><button class="btn sm" type="submit">Send invite</button></div></form></div>';
+  // The list
+  h += '<h2 id="plist">Your list</h2>' +
+    '<div class="filters"><select id="f-trade" aria-label="Trade"><option value="">All trades</option>' + Object.keys(SITE.trades).map(function (t) { return '<option value="' + t + '"' + (FIL.trade === t ? ' selected' : '') + '>' + esc(tname(t)) + '</option>'; }).join('') + '</select>' +
+    '<select id="f-county" aria-label="County"><option value="">All counties</option>' + SITE.counties.map(function (c) { return '<option' + (FIL.county === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' +
+    '<select id="f-stage" aria-label="Status">' + [['open', 'Not signed up yet'], ['ready', 'Ready to invite now'], ['', 'Everyone'], ['applied', 'Applied'], ['live', 'Live'], ['not_interested', 'Not interested'], ['unsubscribed', 'Asked for no emails']].map(function (o) { return '<option value="' + o[0] + '"' + (FIL.stage === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
+    '<input type="search" id="f-q" placeholder="Search name, email, town" value="' + esc(FIL.q) + '" aria-label="Search"></div>';
+  if (!REC.can_bulk) h += '<div class="notice warn"><b>Bulk invites are off until you add your mailing address.</b> Set MAILING_ADDRESS in Vercel, or mailingAddress in public/assets/config.js. The law (CAN-SPAM) requires a postal address in emails to companies that haven\'t signed up. A PO box works.</div>';
+  h += '<div class="bulk"><span class="sub">' + list.length + ' shown, ' + sel.length + ' picked' + (sel.length > ready.length ? ' (' + (sel.length - ready.length) + ' can\'t be emailed now)' : '') + '</span>' +
+    '<button class="quiet" type="button" data-pickall>' + (list.length && list.every(function (p) { return picked[p.id]; }) ? 'Unpick all' : 'Pick all shown') + '</button>' +
+    '<input type="text" id="note" maxlength="400" value="' + esc(NOTE) + '" placeholder="Optional line at the top of the email, like where you met them" aria-label="Optional note for the invite email">' +
+    '<button class="btn sm" type="button" data-bulk' + (REC.can_bulk && ready.length ? '' : ' disabled') + '>Invite ' + (ready.length || '') + (ready.length > 100 ? ' (first 100)' : '') + '</button></div>';
+  h += table(['', 'Company', 'Trade and county', 'Status', ''], list.slice(0, 300).map(prospectRow), REC.prospects.length ? 'Nobody matches these filters.' : 'Your list is empty. Add companies above.');
+  if (list.length > 300) h += '<p class="small sub">Showing the first 300. Narrow it with the filters.</p>';
+  return h;
+}
+function prospectRow(p) {
+  var st = STAGE[p.stage] || ['plain', p.stage];
+  return '<tr><td><input type="checkbox" data-pick="' + p.id + '"' + (picked[p.id] ? ' checked' : '') + ' aria-label="Pick ' + esc(p.company) + '"></td>' +
+    '<td><b>' + esc(p.company) + '</b><br><span class="sub">' + esc([p.contact, p.email, p.phone].filter(Boolean).join(' · ')) + '</span>' + (p.notes ? '<br><span class="sub small">' + esc(p.notes) + '</span>' : '') + (p.list_name ? '<br><span class="sub small">From ' + esc(p.list_name) + '</span>' : '') + '</td>' +
+    '<td>' + esc(p.trades.map(tname).join(', ') || 'Trade not set') + '<br><span class="sub">' + esc(p.counties.join(', ') || 'County not set') + (p.town ? ' · ' + esc(p.town) : '') + '</span></td>' +
+    '<td><span class="pill ' + st[0] + '">' + st[1] + '</span>' + (p.invite_count ? '<br><span class="sub small">Invited ' + p.invite_count + 'x, last ' + when(p.invited_at) + '</span>' : '') + (p.blocked && ['new', 'invited', 'clicked'].indexOf(p.stage) >= 0 ? '<br><span class="sub small">' + esc(p.blocked) + '</span>' : '') + '</td>' +
+    '<td>' + (['applied', 'approved', 'live', 'unsubscribed'].indexOf(p.stage) >= 0 ? '' : '<button class="quiet" type="button" data-noint="' + p.id + '" data-val="' + (p.stage !== 'not_interested') + '">' + (p.stage === 'not_interested' ? 'Undo' : 'Not interested') + '</button>') + '</td></tr>';
+}
+async function loadRecruit() {
+  try { REC = await call(null, '?view=recruit'); } catch (x) { toast(x.message); REC = null; return; }
+  if (tab === 'recruit') render();
+}
+
+// ---- Adding a list: paste from a spreadsheet or pick a CSV file. Columns are matched by their names. ----
+var FIELDS = { company: /^(company|business|business name|company name|name|dba)$/, contact: /^(contact|owner|contact name|first name|full name|person)$/, email: /e-?mail/, phone: /phone|mobile|cell|tel/,
+  website: /web|url|site/, license: /licen[cs]e/, town: /^(town|city|municipality|locality)$/, county: /county/, zip: /^(zip|zip code|postal|postal code|zipcode)$/, trade: /trade|category|type|service|industry/, notes: /note|comment/ };
+function parseTable(text) {
+  text = String(text || '').replace(/^﻿/, '');
+  var first = text.split(/\r?\n/)[0] || '', sep = first.split('\t').length > first.split(',').length ? '\t' : ',';
+  var rows = [], row = [], cur = '', q = false;
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"' && cur === '') q = true;
+    else if (ch === sep) { row.push(cur); cur = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cur); cur = ''; if (row.some(function (c) { return c.trim(); })) rows.push(row); row = []; }
+    else cur += ch;
+  }
+  row.push(cur); if (row.some(function (c) { return c.trim(); })) rows.push(row);
+  return rows;
+}
+var PLACES = null;
+function countyOf(r) {
+  if (r.county) { var c = r.county.replace(/\s*county\s*$/i, '').trim().toLowerCase(); var hit = SITE.counties.filter(function (x) { return x.toLowerCase() === c; })[0]; if (hit) return hit; }
+  var z = String(r.zip || '').match(/\d{5}/); if (z && window.NJ_ZIPS && NJ_ZIPS[z[0]]) return SITE.counties[NJ_ZIPS[z[0]][0]];
+  if (r.town && window.NJ_ZIPS) {
+    if (!PLACES) { PLACES = {}; Object.keys(NJ_ZIPS).forEach(function (k) { PLACES[NJ_ZIPS[k][1].toLowerCase()] = SITE.counties[NJ_ZIPS[k][0]]; }); }
+    return PLACES[r.town.trim().toLowerCase()] || '';
+  }
+  return '';
+}
+function tradesOf(text) {
+  var t = String(text || '').toLowerCase(), out = [];
+  if (/hvac|heat|cool|air cond|furnace|boiler|a\/c|mechanical/.test(t)) out.push('hvac');
+  if (/plumb|drain|sewer|water heater/.test(t)) out.push('plumbing');
+  if (/electric/.test(t)) out.push('electrical');
+  if (/appliance/.test(t)) out.push('appliance');
+  return out;
+}
+function prepImport(text, name) {
+  var rows = parseTable(text);
+  if (rows.length < 2) { IMPORT = { error: 'Include a header row (like Company, Email, Phone, Town) and at least one company.' }; return render(); }
+  var heads = rows[0].map(function (x) { return x.trim().toLowerCase(); }), map = {};
+  Object.keys(FIELDS).forEach(function (f) { var i = heads.findIndex(function (h, k) { return FIELDS[f].test(h) && Object.keys(map).every(function (m) { return map[m] !== k; }); }); if (i >= 0) map[f] = i; });
+  if (map.company == null) { IMPORT = { error: 'We couldn\'t find a company name column. Name it Company.' }; return render(); }
+  IMPORT = { name: name || 'List ' + new Date().toLocaleDateString('en-US'), map: map, heads: rows[0], rows: rows.slice(1), trade: '', county: '' };
+  render();
+}
+function importRows() {
+  var m = IMPORT.map, g = function (r, f) { return m[f] == null ? '' : String(r[m[f]] || '').trim(); };
+  return IMPORT.rows.map(function (r) {
+    var row = { company: g(r, 'company'), contact: g(r, 'contact'), email: g(r, 'email'), phone: g(r, 'phone'), website: g(r, 'website'), license: g(r, 'license'), town: g(r, 'town'), county: g(r, 'county'), zip: g(r, 'zip'), notes: g(r, 'notes') };
+    var tr = tradesOf(g(r, 'trade')), co = countyOf(row);
+    return { company: row.company, contact: row.contact, email: row.email, phone: row.phone, website: row.website, license: row.license, town: row.town, notes: row.notes,
+      trades: tr.length ? tr : IMPORT.trade ? [IMPORT.trade] : [], counties: co ? [co] : IMPORT.county ? [IMPORT.county] : [] };
+  });
+}
+function importCard() {
+  var h = '<div class="card" id="importer"><h3>Add a list</h3>';
+  if (!IMPORT || IMPORT.error) {
+    return h + '<p class="small sub">Paste rows from a spreadsheet, or pick a CSV file. Include a header row. We match columns named like Company, Contact, Email, Phone, Town, County, ZIP, Trade, Website, License, and Notes.</p>' +
+      '<div><label for="imp-text">Paste rows</label><textarea id="imp-text" rows="4" placeholder="Company, Email, Phone, Town&#10;Example Heating, info@example.com, 908-555-0100, Warren"></textarea></div>' +
+      '<div class="row"><div><label for="imp-file">Or pick a CSV file</label><input type="file" id="imp-file" accept=".csv,.txt,text/csv"></div><div><label for="imp-name">Name this list (optional)</label><input type="text" id="imp-name" placeholder="Supply house list"></div></div>' +
+      (IMPORT && IMPORT.error ? '<p class="err" role="alert">' + esc(IMPORT.error) + '</p>' : '') + '<div><button class="btn sm" type="button" data-prep>Check the list</button></div></div>';
+  }
+  var rows = importRows(), noTrade = rows.filter(function (r) { return !r.trades.length; }).length, noCounty = rows.filter(function (r) { return !r.counties.length; }).length;
+  var found = Object.keys(IMPORT.map).map(function (f) { return f + ' = "' + IMPORT.heads[IMPORT.map[f]].trim() + '"'; }).join(', ');
+  h += '<p class="small sub"><b>' + rows.length + ' companies</b> in "' + esc(IMPORT.name) + '". Columns matched: ' + esc(found) + '.</p>' +
+    '<div class="row"><div><label for="imp-trade">Trade for rows without one (' + noTrade + ')</label><select id="imp-trade"><option value="">Leave blank</option>' + Object.keys(SITE.trades).map(function (t) { return '<option value="' + t + '"' + (IMPORT.trade === t ? ' selected' : '') + '>' + esc(tname(t)) + '</option>'; }).join('') + '</select></div>' +
+    '<div><label for="imp-county">County for rows without one (' + noCounty + ')</label><select id="imp-county"><option value="">Leave blank</option>' + SITE.counties.map(function (c) { return '<option' + (IMPORT.county === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div></div>' +
+    '<div class="tablewrap"><table class="list"><thead><tr><th>Company</th><th>Email</th><th>Trade</th><th>County</th></tr></thead><tbody>' + rows.slice(0, 5).map(function (r) { return '<tr><td>' + esc(r.company) + '</td><td>' + esc(r.email || r.phone) + '</td><td>' + esc(r.trades.map(tname).join(', ')) + '</td><td>' + esc(r.counties.join(', ')) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+    (rows.length > 5 ? '<p class="small sub">And ' + (rows.length - 5) + ' more.</p>' : '') +
+    '<div class="btns"><button class="btn sm" type="button" data-import>Add ' + rows.length + ' companies</button><button class="btn sm ghost" type="button" data-noimport>Start over</button></div></div>';
+  return h;
+}
 function gate(msg) {
   app.innerHTML = '<div class="narrow"><h1>Admin</h1><p class="sub">Enter the admin key you set as ADMIN_KEY in Vercel.</p>' +
     '<form class="card" id="gate"><div><label for="key">Admin key</label><input type="text" id="key" autocomplete="off" autocapitalize="off" spellcheck="false"></div>' +
@@ -114,7 +273,7 @@ function render() {
   var asked = recent.filter(function (r) { return r.alerted; }), firsts = asked.map(function (r) { return r.first_yes_min; }).filter(function (v) { return v != null; }).sort(function (a, b) { return a - b; });
   var median = firsts.length ? firsts[Math.floor((firsts.length - 1) / 2)] : null;
   var pct = function (n, d) { return d ? Math.round(n / d * 100) + '%' : 'n/a'; };
-  var tabs = [['todo', 'Needs you', todo], ['contractors', 'Contractors (' + C.length + ')'], ['requests', 'Requests'], ['funnel', 'Funnel and invites'], ['fees', 'Lead fees', 0]];
+  var tabs = [['todo', 'Needs you', todo], ['setup', 'Launch checklist', SETUP ? SETUP.bad : 0], ['recruit', 'Recruiting'], ['contractors', 'Contractors (' + C.length + ')'], ['requests', 'Requests'], ['funnel', 'Funnel'], ['fees', 'Lead fees', 0]];
   var h = '<div class="split"><h1>Admin</h1><div class="btns"><button class="btn sm ghost" type="button" data-daily>Run daily tasks now</button><button class="btn sm ghost" type="button" data-refresh>Refresh</button><button class="btn sm ghost" type="button" data-lock>Lock</button></div></div>' +
     '<div class="kpis"><div><b>' + live + '</b><span>pros taking requests</span></div><div><b>' + recent.length + '</b><span>requests, last 7 days</span></div>' +
     '<div><b>' + recent.filter(function (r) { return r.state === 'matched'; }).length + '</b><span>matched, last 7 days</span></div><div><b>' + gaps.length + '</b><span>with no one to alert</span></div><div><b>' + money(owed) + '</b><span>lead fees owed to you</span></div></div>' +
@@ -126,6 +285,7 @@ function render() {
     '<div><b>' + pct(recent.filter(function (r) { return r.reopened; }).length, recent.filter(function (r) { return r.state === 'matched' || r.reopened; }).length) + '</b><span>matches with a no-show</span></div></div>' +
     '<div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" aria-selected="' + (tab === t[0]) + '" data-tab="' + t[0] + '">' + t[1] + (t[2] ? '<b>' + t[2] + '</b>' : '') + '</button>'; }).join('') + '</div>';
   if (tab === 'todo') {
+    if (SETUP && SETUP.bad) h += '<div class="notice crit" style="margin-top:20px"><b>' + SETUP.bad + ' setup item' + (SETUP.bad === 1 ? '' : 's') + ' to fix before launch.</b> <button class="quiet" type="button" data-tab="setup">Open the launch checklist</button></div>';
     h += '<h2>Applications to check</h2><p class="sub">Look up each license with the state board for that trade before you approve. Approving sends them an email.</p>' + table(CHEADS, pending.map(contractorRow), 'No applications waiting.') +
       '<h2>Requests with no one to alert</h2><p class="sub">Last 7 days. These are the counties and services to recruit for first. Call the customer if you can help them yourself.</p>' + table(RHEADS, gaps.map(requestRow), 'None. Every request had someone to alert.') +
       '<h2>Lead fees to decide</h2><p class="sub">The customer canceled, reported a no-show, or the pro says they couldn\'t reach the customer. Waive the fee or keep it.</p>' + table(FHEADS, reviews.map(feeRow), 'Nothing to decide.') +
@@ -140,8 +300,11 @@ function render() {
       step('Started on the home page booking card', F.request_started) + step('Opened the request form', F.form_opened) + step('Sent a request', sent, F.form_opened) + step('Got at least one yes', yes, sent) + step('Chose a pro', matched, yes) + step('Left a review', reviewed, matched) + '</tbody></table></div>' +
       '<p class="small sub">Also: ' + (F.offer_alerts_on || 0) + ' turned on offer alerts, ' + (F.details_added || 0) + ' added details while waiting, ' + (F.photo_added || 0) + ' added photos, ' + (F.switched_pro || 0) + ' switched to a standby pro, ' + (F.request_canceled || 0) + ' canceled, ' + (F.links_requested || 0) + ' asked for their link by email.</p>' +
       '<h2>Contractors, last 7 days</h2><div class="tablewrap"><table class="list"><tbody>' + step('Started the sign-up form', F.pro_apply_started) + step('Applied', F.pro_applied, F.pro_apply_started) + step('Confirmed a job after being chosen', F.pro_confirmed) + step('Sent "On my way"', F.pro_eta_on_way) + '</tbody></table></div>' +
-      '<h2>Invite a contractor</h2><p class="sub">After a recruiting call: they get an email with a sign-up link, their email already filled in.</p>' +
-      '<form class="card" id="invite" style="max-width:560px"><div class="row"><div><label for="iname">Their name (optional)</label><input type="text" id="iname"></div><div><label for="iemail">Their email</label><input type="email" id="iemail"></div></div><div><button class="btn sm" type="submit">Send invite</button></div></form>';
+      '';
+  } else if (tab === 'setup') {
+    h += setupTab();
+  } else if (tab === 'recruit') {
+    h += recruitTab();
   } else if (tab === 'requests') {
     h += '<p class="sub">The latest 100 requests.</p>' + table(RHEADS, R.map(requestRow), 'No requests yet.');
   } else {
@@ -152,15 +315,26 @@ function render() {
 }
 async function load() {
   if (!KEY) return gate();
-  try { D = await call(); render(); }
+  try { D = await call(); render(); if (!SETUP) loadSetup(); }
   catch (e) { if (e.status === 401 || e.status === 503) { KEY = ''; try { sessionStorage.removeItem('adminKey'); } catch (x) {} gate(e.message); } else if (D) toast(e.message); else app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div>'; }
 }
 app.addEventListener('submit', async function (e) {
   if (e.target.id === 'editc' || e.target.id === 'invite') {
     e.preventDefault();
     var v = function (id) { return document.getElementById(id).value.trim(); }, checked = function (n) { return Array.prototype.map.call(document.querySelectorAll('input[name=' + n + ']:checked'), function (i) { return i.value; }); };
-    var body = e.target.id === 'invite' ? { action: 'invite', email: v('iemail'), name: v('iname') } : { action: 'edit_contractor', id: e.target.dataset.id, company: v('ec'), license: v('el'), business_phone: v('ep'), trades: checked('et'), counties: checked('eco') };
-    try { await call(body); toast(body.action === 'invite' ? 'Invite sent.' : 'Saved.'); editing = null; await load(); } catch (x) { toast(x.message); }
+    var body = e.target.id === 'invite' ? { action: 'invite', email: v('iemail'), name: v('iname'), trade: v('itrade'), county: v('icounty') } : { action: 'edit_contractor', id: e.target.dataset.id, company: v('ec'), license: v('el'), business_phone: v('ep'), trades: checked('et'), counties: checked('eco') };
+    try { await call(body); toast(body.action === 'invite' ? 'Invite sent.' : 'Saved.'); editing = null; if (body.action === 'invite') REC = null; await load(); } catch (x) { toast(x.message); }
+    return;
+  }
+  // Launch checklist test messages
+  if (['t-email', 't-text', 't-alert'].indexOf(e.target.id) >= 0) {
+    e.preventDefault();
+    var f = e.target, b = f.querySelector('button'), val = function (id) { return document.getElementById(id).value.trim(); };
+    var tb = f.id === 't-email' ? { action: 'test_email', to: val('te') } : f.id === 't-text' ? { action: 'test_text', to: val('tt') } : { action: 'sample_alert', email: val('ae'), phone: val('ap') };
+    b.disabled = true;
+    try { var r = await call(tb); toast(r.logged ? 'Local preview: the email was printed to the server log instead of sent.' : f.id === 't-text' ? 'Test text sent. It should arrive within a minute.' : 'Sent. Check your inbox' + (f.id === 't-alert' && r.texted ? ' and your phone' : '') + ', and the spam folder.'); }
+    catch (x) { toast(x.message); }
+    b.disabled = false;
     return;
   }
   if (e.target.id !== 'gate') return;
@@ -169,6 +343,32 @@ app.addEventListener('submit', async function (e) {
 app.addEventListener('click', async function (e) {
   var t = e.target.closest('button'); if (!t) return;
   if (t.dataset.tab) { tab = t.dataset.tab; return render(); }
+  if (t.hasAttribute('data-recheck')) { SETUP = null; return render(); }
+  if (t.dataset.cell) { var cp = t.dataset.cell.split('|'); var same = FIL.county === cp[0] && FIL.trade === cp[1]; FIL.county = same ? '' : cp[0]; FIL.trade = same ? '' : cp[1]; FIL.stage = 'open'; render(); if (!same) { var pl = document.getElementById('plist'); if (pl) pl.scrollIntoView({ behavior: 'smooth' }); } return; }
+  if (t.hasAttribute('data-pickall')) { var L = shown(), all = L.length && L.every(function (p) { return picked[p.id]; }); L.forEach(function (p) { if (all) delete picked[p.id]; else picked[p.id] = true; }); return render(); }
+  if (t.hasAttribute('data-prep')) {
+    var file = document.getElementById('imp-file').files[0], nm = document.getElementById('imp-name').value.trim(), txt = document.getElementById('imp-text').value;
+    if (file) { var rd = new FileReader(); rd.onload = function () { prepImport(String(rd.result), nm || file.name.replace(/\.[^.]+$/, '')); }; rd.readAsText(file); } else prepImport(txt, nm);
+    return;
+  }
+  if (t.hasAttribute('data-noimport')) { IMPORT = null; return render(); }
+  if (t.hasAttribute('data-import')) {
+    t.disabled = true; t.textContent = 'Adding...';
+    try { var ir = await call({ action: 'prospects_import', rows: importRows(), list_name: IMPORT.name }); var sk = ir.skipped, skipped = sk.duplicate + sk.signed_up + sk.no_company + sk.no_contact; IMPORT = null; REC = null; toast('Added ' + ir.added + '.' + (skipped ? ' Skipped ' + skipped + ': ' + [sk.duplicate && sk.duplicate + ' already on the list', sk.signed_up && sk.signed_up + ' already signed up', sk.no_contact && sk.no_contact + ' with no email or phone', sk.no_company && sk.no_company + ' with no company name'].filter(Boolean).join(', ') + '.' : '')); render(); }
+    catch (x) { toast(x.message); t.disabled = false; t.textContent = 'Add companies'; }
+    return;
+  }
+  if (t.hasAttribute('data-bulk')) {
+    var ids = shown().filter(function (p) { return picked[p.id] && !p.blocked; }).map(function (p) { return p.id; });
+    t.disabled = true; t.textContent = 'Sending...';
+    try { var br = await call({ action: 'prospects_invite', ids: ids, note: document.getElementById('note').value.trim() }); picked = {}; NOTE = ''; REC = null; toast('Sent ' + br.sent + ' invite' + (br.sent === 1 ? '' : 's') + '.' + (br.skipped ? ' ' + br.skipped + ' skipped.' : '') + (br.error ? ' Stopped early: ' + br.error : '')); render(); }
+    catch (x) { toast(x.message); t.disabled = false; t.textContent = 'Invite'; }
+    return;
+  }
+  if (t.dataset.noint) {
+    try { await call({ action: 'prospect_update', id: t.dataset.noint, not_interested: t.dataset.val === 'true' }); REC = null; render(); } catch (x) { toast(x.message); }
+    return;
+  }
   if (t.hasAttribute('data-refresh')) return load();
   if (t.dataset.edit) { editing = t.dataset.edit; return render(); }
   if (t.hasAttribute('data-noedit')) { editing = null; return render(); }
@@ -185,6 +385,20 @@ app.addEventListener('click', async function (e) {
   t.disabled = true;
   try { await call(body); toast(body.status === 'approved' ? 'Approved. They\'ve been emailed.' : body.status ? 'Paused. They won\'t get requests.' : body.action === 'waive' ? 'Fee waived.' : body.action === 'keep' ? 'Fee kept.' : body.action === 'cancel_request' ? 'Request removed.' : body.action === 'hide_review' ? (body.hidden ? 'Review hidden.' : 'Review shown.') : 'Saved.'); await load(); }
   catch (x) { t.disabled = false; toast(x.message); }
+});
+// Recruiting filters, picks, and the import defaults.
+app.addEventListener('change', function (e) {
+  var el = e.target;
+  if (el.dataset.pick) { if (el.checked) picked[el.dataset.pick] = true; else delete picked[el.dataset.pick]; return render(); }
+  if (el.id === 'f-trade' || el.id === 'f-county' || el.id === 'f-stage') { FIL[el.id.slice(2)] = el.value; return render(); }
+  if (el.id === 'imp-trade' || el.id === 'imp-county') { IMPORT[el.id.slice(4)] = el.value; return render(); }
+});
+var searchT;
+app.addEventListener('input', function (e) {
+  if (e.target.id === 'note') { NOTE = e.target.value; return; }
+  if (e.target.id !== 'f-q') return;
+  clearTimeout(searchT);
+  searchT = setTimeout(function () { FIL.q = e.target.value.trim(); var pos = e.target.selectionStart; render(); var q = document.getElementById('f-q'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch (x) {} } }, 250);
 });
 load();
 </script>

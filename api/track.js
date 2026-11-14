@@ -4,7 +4,7 @@ const store = require('../lib/store');
 const { wrap, str, deviceHash } = require('../lib/http');
 
 const ALLOWED = ['request_started', 'form_opened', 'request_submitted', 'details_added', 'photo_added', 'offer_alerts_on', 'request_canceled', 'no_show_reported', 'switched_pro', 'review_sent', 'links_requested', 'contact_fixed',
-  'pro_apply_started', 'pro_applied', 'pro_confirmed', 'pro_eta_on_way', 'pro_eta_late', 'pro_eta_arrived', 'pro_result_done', 'pro_result_canceled', 'pro_result_no_contact'];
+  'pro_apply_started', 'pro_applied', 'pro_texts_on', 'pro_confirmed', 'pro_eta_on_way', 'pro_eta_late', 'pro_eta_arrived', 'pro_result_done', 'pro_result_canceled', 'pro_result_no_contact'];
 
 module.exports = wrap({
   async POST({ body, headers }) {

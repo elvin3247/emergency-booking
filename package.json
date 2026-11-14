@@ -5,8 +5,8 @@
   "engines": { "node": ">=18" },
   "scripts": {
     "build": "node scripts/build.js",
-    "dev": "STORE=memory AUTO_APPROVE=1 ADMIN_EMAIL=admin@example.com node dev-server.js",
-    "test": "STORE=memory AUTO_APPROVE=1 node test/flow.test.js"
+    "dev": "node dev-server.js",
+    "test": "node test/flow.test.js"
   },
   "dependencies": { "@supabase/supabase-js": "^2.45.0" }
 }

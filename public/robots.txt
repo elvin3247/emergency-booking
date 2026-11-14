@@ -4,3 +4,4 @@ Disallow: /status
 Disallow: /respond
 Disallow: /pro
 Disallow: /admin
+Disallow: /unsubscribe

@@ -75,6 +75,7 @@
           <div><label id="counties-l">Counties you serve</label><div class="chips" role="group" aria-labelledby="counties-l" id="chips"></div></div>
           <div class="hp" aria-hidden="true"><label for="website">Leave this empty</label><input type="text" id="website" tabindex="-1" autocomplete="off"></div>
           <label class="check" for="consent"><input type="checkbox" id="consent"><span id="consent-text"></span></label>
+          <label class="check" for="sms"><input type="checkbox" id="sms"><span><b>Also text me job alerts (optional).</b> <span id="sms-text"></span></span></label>
           <p class="err" id="err" role="alert" hidden></p>
           <div><button class="btn" type="submit" id="go">Continue</button></div>
         </form>
@@ -91,9 +92,12 @@ if (!SITE.freeLaunch) document.getElementById('deal').firstElementChild.outerHTM
 document.getElementById('trades').innerHTML = Object.keys(SITE.trades).map(function (t) { return '<label class="chip" for="t-' + t + '"><input type="checkbox" id="t-' + t + '" value="' + t + '"><span>' + SITE.trades[t].name + '</span></label>'; }).join('');
 document.getElementById('chips').innerHTML = SITE.counties.map(function (c, i) { return '<label class="chip" for="c' + i + '"><input type="checkbox" id="c' + i + '" value="' + c + '"><span>' + c + '</span></label>'; }).join('');
 document.getElementById('consent-text').innerHTML = esc(SITE.consent.contractor) + ' See our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.';
-// Invited after a call: their email is already filled in.
-var inv = new URLSearchParams(location.search).get('email');
-if (inv && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inv)) document.getElementById('email').value = inv;
+document.getElementById('sms-text').textContent = SITE.consent.sms;
+// Invited: their email is already filled in. A recruiting invite also carries a private code, so we know the invite worked.
+var qs = new URLSearchParams(location.search), invEmail = qs.get('email'), invCode = qs.get('inv') || '';
+if (invEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invEmail)) document.getElementById('email').value = invEmail;
+if (invCode) { try { sessionStorage.setItem('inv', invCode); } catch (e) {} api('/api/contractors', { action: 'invite_click', inv: invCode }).then(function (r) { var em = document.getElementById('email'); if (r.email && !em.value) em.value = r.email; }).catch(function () {}); }
+else { try { invCode = sessionStorage.getItem('inv') || ''; } catch (e) {} }
 var startedApply = false;
 document.getElementById('f').addEventListener('input', function () { if (!startedApply) { startedApply = true; track('pro_apply_started'); } });
 document.getElementById('f').addEventListener('submit', async function (e) {
@@ -103,7 +107,8 @@ document.getElementById('f').addEventListener('submit', async function (e) {
   try {
     var out = await api('/api/contractors', { company: v('company'), contact: v('contact'), email: v('email'), mobile: v('mobile'), license: v('license'), website: v('website'), source: siteSource(),
       trades: Array.prototype.map.call(document.querySelectorAll('#trades input:checked'), function (i) { return i.value; }),
-      counties: Array.prototype.map.call(document.querySelectorAll('#chips input:checked'), function (i) { return i.value; }), consent: document.getElementById('consent').checked });
+      counties: Array.prototype.map.call(document.querySelectorAll('#chips input:checked'), function (i) { return i.value; }), consent: document.getElementById('consent').checked,
+      sms: document.getElementById('sms').checked, inv: invCode });
     track('contractor_applied');
     track('pro_applied');
     location.href = '/pro?t=' + encodeURIComponent(out.token);

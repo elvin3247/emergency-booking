@@ -70,6 +70,18 @@ function profileForm() {
     '<div><label for="extra">Also send alerts to (optional)</label><input type="text" id="extra" inputmode="email" autocapitalize="off" placeholder="dispatch@yourcompany.com" value="' + esc(x.join(', ')) + '"><p class="small sub" style="margin-top:4px">Up to 3 more emails, separated by commas. Good for a dispatcher or office manager.</p></div>' +
     '<p class="err" id="perr" role="alert" hidden></p><div><button class="btn" type="submit" id="pgo">Save profile</button></div></form>';
 }
+// Text alerts: on or off, with the carrier-required opt-in box when turning them on.
+function textsCard() {
+  var phone = '<input type="tel" id="sms_mobile" autocomplete="tel" value="' + esc(D.mobile) + '">';
+  if (D.sms_on) return '<div class="card" id="texts"><div class="split"><h2>Text alerts</h2><span class="pill ok">On</span></div>' +
+    '<p class="sub">New requests, reminders, and "you were chosen" also come by text to <b>' + esc(D.mobile) + '</b>. Email still comes too.' + (D.sms_ready ? '' : ' Texting starts as soon as we switch it on for everyone. Email covers you until then.') + '</p>' +
+    '<div><button class="btn ghost" type="button" data-texts="off">Turn off text alerts</button></div></div>';
+  return '<form class="card" id="texts" novalidate><div class="split"><h2>Text alerts</h2><span class="pill plain">Off</span></div>' +
+    '<p class="sub">Get new requests by text so you can answer from a job site. Faster answers win more jobs.' + (D.sms_off_reason && D.sms_off_reason !== 'Turned off by you' ? ' We stopped texting your last number: ' + esc(D.sms_off_reason.toLowerCase()) + '.' : '') + '</p>' +
+    '<div><label for="sms_mobile">Mobile number for texts</label>' + phone + '</div>' +
+    '<label class="check" for="sms_ok"><input type="checkbox" id="sms_ok"><span>' + esc(SITE.consent.sms) + '</span></label>' +
+    '<p class="err" id="serr" role="alert" hidden></p><div><button class="btn" type="submit" id="sgo">Turn on text alerts</button></div></form>';
+}
 function render() {
   var h = '';
   if (!D.setup_complete) {
@@ -82,7 +94,7 @@ function render() {
       : paused
         ? '<div class="notice warn"><b>Paused until ' + esc(when(D.paused_until)) + '.</b> You won\'t get requests until then.</div>'
         : D.in_hours
-          ? '<div class="notice good"><b>You\'re on call.</b> Requests in ' + D.counties.length + ' ' + (D.counties.length === 1 ? 'county' : 'counties') + ' go to ' + esc(D.email) + '.</div>'
+          ? '<div class="notice good"><b>You\'re on call.</b> Requests in ' + D.counties.length + ' ' + (D.counties.length === 1 ? 'county' : 'counties') + ' go to ' + esc(D.email) + (D.sms_on && D.sms_ready ? ' and by text to ' + esc(D.mobile) : '') + '.</div>'
           : '<div class="notice warn"><b>Outside your alert hours right now.</b> Requests start again at your set hours: ' + esc(SITE.alertHours[D.alert_hours]) + '.</div>';
     // Came from "Pause alerts until 7am" in an alert email: one tap to confirm.
     if (pauseAsk && !paused) h += '<div class="card" style="border-color:var(--accent)"><h2>Pause alerts until 7am?</h2><p class="sub">You won\'t get new requests tonight. They start again at 7am.</p><div class="btns"><button class="btn" type="button" data-pause="morning">Yes, pause until 7am</button><button class="btn ghost" type="button" data-noask>Not now</button></div></div>';
@@ -94,6 +106,7 @@ function render() {
           '<button class="btn ghost" type="button" data-pause="morning">Until 7am</button>' +
           '<button class="btn ghost" type="button" data-pause="monday">Until Monday 7am</button>' +
           '<button class="btn ghost" type="button" data-pause="off">Until I turn them back on</button></div>') + '</div>';
+    h += textsCard();
     h += '<p class="sub">' + (SITE.freeLaunch ? 'No lead fees during our launch. If that ever changes, we\'ll email you at least 30 days ahead.' : D.free_leads_left > 0 ? 'Free leads left: <b>' + D.free_leads_left + '</b>. After that, $' + SITE.leadFee + ' only when a customer chooses you.' : 'You pay $' + SITE.leadFee + ' only when a customer chooses you.') + '</p>';
     h += profileForm() + '<h2>Your settings</h2>' + settingsForm(false);
     h += '<p class="small sub">Keep this page private. Anyone with the link can change your settings.</p>';
@@ -107,6 +120,10 @@ async function load() {
 app.addEventListener('click', async function (e) {
   if (e.target.closest('[data-all]')) { showAll = !showAll; render(); return; }
   if (e.target.closest('[data-noask]')) { pauseAsk = false; render(); return; }
+  if (e.target.closest('[data-texts="off"]')) {
+    try { D = await api('/api/pro', { t: t, action: 'texts', on: false }); render(); toast('Text alerts are off. Email still comes.'); } catch (x) { toast(x.message); }
+    return;
+  }
   var b = e.target.closest('[data-pause]'); if (!b) return;
   document.querySelectorAll('[data-pause]').forEach(function (x) { x.disabled = true; });
   try { D = await api('/api/pro', { t: t, action: 'pause', until: b.dataset.pause }); render(); toast(D.paused_until ? 'Alerts paused.' : 'Alerts are back on.'); window.scrollTo(0, 0); }
@@ -114,6 +131,13 @@ app.addEventListener('click', async function (e) {
 });
 app.addEventListener('submit', async function (e) {
   e.preventDefault();
+  if (e.target.id === 'texts') {
+    var se = document.getElementById('serr'), sg = document.getElementById('sgo');
+    se.hidden = true; sg.disabled = true; sg.textContent = 'Turning on...';
+    try { D = await api('/api/pro', { t: t, action: 'texts', on: true, mobile: document.getElementById('sms_mobile').value.trim(), consent: document.getElementById('sms_ok').checked }); render(); toast('Text alerts are on.' + (D.sms_ready ? ' We sent you a test text.' : '')); track('pro_texts_on'); }
+    catch (x) { se.textContent = x.message; se.hidden = false; sg.disabled = false; sg.textContent = 'Turn on text alerts'; }
+    return;
+  }
   if (e.target.id === 'pf') {
     var pe = document.getElementById('perr'), pg = document.getElementById('pgo'), val = function (id) { return document.getElementById(id).value.trim(); };
     pe.hidden = true; pg.disabled = true; pg.textContent = 'Saving...';

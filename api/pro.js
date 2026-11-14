@@ -2,6 +2,8 @@
 // The link is the only key, so it never shows customer details. Each job links to its own job page for that.
 const C = require('../lib/config');
 const store = require('../lib/store');
+const sms = require('../lib/sms');
+const E = require('../lib/emails');
 const { wrap, bad, str, digits, isEmail, withinHours, pauseUntil, isReady, isPaused, openedAt } = require('../lib/http');
 
 async function load(t) {
@@ -36,7 +38,8 @@ const view = c => ({
   visit_fee: c.visit_fee, business_phone: c.business_phone, alert_hours: c.alert_hours,
   paused_until: isPaused(c) ? c.paused_until : null, in_hours: withinHours(c.alert_hours),
   free_leads_left: c.free_leads_left, setup_complete: isReady(c), id: c.id,
-  about: c.about || '', years_in_business: c.years_in_business, website: c.website || '', extra_emails: c.extra_emails || []
+  about: c.about || '', years_in_business: c.years_in_business, website: c.website || '', extra_emails: c.extra_emails || [],
+  mobile: c.mobile || '', sms_on: !!c.sms_on, sms_off_reason: c.sms_on ? null : c.sms_off_reason || null, sms_ready: sms.on()
 });
 const full = async c => Object.assign(view(c), { jobs: await jobs(c) });
 
@@ -82,6 +85,15 @@ module.exports = wrap({
       const badEmail = extra.find(e => !isEmail(e));
       if (badEmail) throw bad(badEmail + ' is not a valid email address.');
       return full(await store.updateContractor(c.id, { about: str(body.about, 600) || null, years_in_business: years, website: website || null, extra_emails: extra.filter(e => e !== c.email) }));
+    }
+    if (body.action === 'texts') {
+      // Text alerts on or off. Turning them on needs the opt-in box, and sends one confirmation text.
+      if (body.on !== true) return full(await store.updateContractor(c.id, { sms_on: false, sms_off_reason: 'Turned off by you' }));
+      if (body.consent !== true) throw bad('Check the box to agree to job alert texts.');
+      if (!sms.e164(body.mobile)) throw bad('Enter a 10-digit US mobile number.');
+      const saved = await store.updateContractor(c.id, { mobile: str(body.mobile, 30), sms_on: true, sms_off_reason: null, sms_consent_at: new Date().toISOString(), sms_consent_text: C.consent.sms });
+      await sms.send(saved.mobile, E.textWelcome(saved));
+      return full(saved);
     }
     throw bad('Unknown action.');
   }

@@ -1,5 +1,7 @@
 // End-to-end check of the booking logic against the in-memory store:  npm test
 const assert = require('assert');
+process.env.STORE = 'memory';
+process.env.AUTO_APPROVE = '1';
 process.env.SITE_URL = 'http://localhost:3999';
 process.env.ADMIN_EMAIL = 'admin@example.com';
 process.env.ADMIN_KEY = 'test-admin-key';
@@ -458,7 +460,49 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     const e21 = T2.contractors.find(c => c.id === c21id);
     assert.deepStrictEqual([e21.company, e21.license, e21.trades, e21.counties], ['Test Co 21 LLC', 'NEW-LIC-1', ['hvac', 'plumbing'], ['Hunterdon', 'Warren']]);
     await adm({ action: 'invite', email: 'newpro@example.com', name: 'Jo' });
-    assert.ok(/contractors\?ref=invite&(amp;)?email=newpro%40example.com/.test(mail.outbox.filter(m => m.to === 'newpro@example.com').pop().html), 'invite link fills in their email');
+    assert.ok(/contractors\?ref=invite&(amp;)?inv=[\w-]+/.test(mail.outbox.filter(m => m.to === 'newpro@example.com').pop().html), 'invite link carries the private code that fills in their email');
+    assert.strictEqual((await adm({ action: 'invite', email: 'c21@example.com' })).status, 400, 'no invite to someone already signed up');
+
+    // Text alerts: only pros who opted in, and the email always goes too
+    const sms = require('../lib/sms'), E = require('../lib/emails');
+    const fakeReq = { service: 'heating', problem: 'no-heat', zip: '07059', county: 'Somerset', timing: 'As soon as possible', photos: [] };
+    const off = E.contractorAlert({ id: 'x', email: 'x@example.com', mobile: '9085550100', sms_on: false }, fakeReq, { token: 'tok' });
+    const on = E.contractorAlert({ id: 'x', email: 'x@example.com', mobile: '9085550100', sms_on: true }, fakeReq, { token: 'tok' });
+    assert.ok(!off.text && !off.textTo, 'no text without opt-in');
+    assert.ok(on.textTo && /^YourBrand: New job: no heat, Warren, Somerset Co\. \(07059\).*respond\?t=tok.*STOP/.test(on.text) && on.to === 'x@example.com', 'opted-in pro gets the text and the email');
+    const sentTexts = sms.outbox.length;
+    await mail.send(on);
+    assert.strictEqual(sms.outbox.length, sentTexts + 1, 'text goes out alongside the email');
+    assert.strictEqual(sms.e164('(908) 555-0100'), '+19085550100'); assert.strictEqual(sms.e164('555-0100'), null);
+    const smsSignup = await call('/api/contractors', Object.assign(contractor(77, ['Warren']), { sms: true }));
+    const c77 = T2.contractors.find(c => c.email === 'c77@example.com');
+    assert.ok(smsSignup.status === 200 && c77.sms_on && /Reply STOP/.test(c77.sms_consent_text), 'sign-up stores the text opt-in and its wording');
+    assert.strictEqual((await call('/api/pro', { t: c77.manage_token, action: 'texts', on: true, mobile: '9085550177' })).status, 400, 'turning texts on needs the box checked');
+    await call('/api/pro', { t: c77.manage_token, action: 'texts', on: false });
+    assert.ok(!T2.contractors.find(c => c.email === 'c77@example.com').sms_on, 'pro can turn texts off');
+
+    // Recruiting list: duplicates skipped, bulk invites need the mailing address, unsubscribes stick
+    const imp = (await adm({ action: 'prospects_import', list_name: 'Test list', rows: [{ company: 'Prospect A', email: 'pa@example.com', trades: ['hvac'], counties: ['Warren'] }, { company: 'Prospect A again', email: 'PA@example.com' }, { company: 'No Way To Reach' }, { company: 'Signed Up', email: 'c21@example.com' }] })).data;
+    assert.deepStrictEqual([imp.added, imp.skipped.duplicate, imp.skipped.no_contact, imp.skipped.signed_up], [1, 1, 1, 1], 'import skips duplicates, no contact, and pros already signed up');
+    const pa = T2.prospects.find(p => p.email === 'pa@example.com');
+    const C2 = require('../lib/config'), addr = C2.mailingAddress;
+    C2.mailingAddress = '';
+    assert.strictEqual((await adm({ action: 'prospects_invite', ids: [pa.id] })).status, 400, 'bulk invites need a mailing address');
+    C2.mailingAddress = 'PO Box 9, Warren, NJ 07059';
+    assert.strictEqual((await adm({ action: 'prospects_invite', ids: [pa.id] })).data.sent, 1);
+    const paMail = mail.outbox.filter(m => m.to === 'pa@example.com').pop();
+    assert.ok(/PO Box 9, Warren/.test(paMail.html) && /unsubscribe\?inv=/.test(paMail.html) && paMail.headers['List-Unsubscribe'], 'invite has the address and a no-thanks link');
+    assert.strictEqual((await adm({ action: 'prospects_invite', ids: [pa.id] })).data.sent, 0, 'no second invite within 7 days');
+    await call('/api/contractors', { action: 'unsubscribe', inv: pa.token });
+    T2.prospects.find(p => p.email === 'pa@example.com').invited_at = new Date(Date.now() - 30 * 864e5).toISOString();
+    assert.strictEqual((await adm({ action: 'prospects_invite', ids: [pa.id] })).data.sent, 0, 'never invited again after "no thanks"');
+    C2.mailingAddress = addr;
+    const recView = (await (await fetch('http://localhost:3999/api/admin?view=recruit', { headers: { 'x-admin-key': 'test-admin-key' } })).json());
+    assert.ok(recView.supply.Warren && recView.prospects.find(p => p.email === 'pa@example.com').stage === 'unsubscribed', 'recruiting view shows supply and stages');
+
+    // Launch checklist runs in the local preview
+    const setup = (await (await fetch('http://localhost:3999/api/admin?view=setup', { headers: { 'x-admin-key': 'test-admin-key' } })).json());
+    assert.ok(setup.checks.length > 8 && setup.checks.every(c => ['ok', 'warn', 'bad'].includes(c.state)), 'launch checklist returns every check');
     const Sp = (await call('/api/requests', hReq({ problem: 'clog', email: 'spam@example.com', phone: '908-555-0666' }))).data.token;
     await adm({ action: 'cancel_request', id: reqRow(Sp).id });
     assert.strictEqual((await call('/api/requests?token=' + Sp)).data.state, 'canceled', 'admin can remove a spam request');

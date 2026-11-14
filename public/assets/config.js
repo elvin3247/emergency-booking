@@ -5,6 +5,9 @@
   var C = {
     brand: brand,
     siteUrl: '',        // your live address, e.g. 'https://example.com'. Needed for the sitemap and share previews. Run `npm run build` after changing.
+    // Your business mailing address. The law (CAN-SPAM) requires it in recruiting emails to companies that haven't signed up yet,
+    // so bulk invites stay off until it's filled in. A PO box or registered agent address is fine.
+    mailingAddress: '',
     analytics: 'vercel', // page-view counts via Vercel Web Analytics (turn it on in the Vercel dashboard). Set to '' to remove.
     // Free launch: no lead fees for anyone while we build up the network. Set to false to start charging
     // leadFee per chosen lead (after each pro's freeLeads). Give pros 30 days' notice by email first, as the terms promise.
@@ -95,7 +98,9 @@
     // Have a lawyer review both of these before launch.
     consent: {
       homeowner: 'I agree to get emails and texts from ' + brand + ' about this request, and a call, text, or email from the one contractor I choose.',
-      contractor: 'I agree to get job alerts from ' + brand + ' by email and text at the contacts above, to the lead terms on this page, and to my company name, trade, license number, and business phone being shown on the site.'
+      contractor: 'I agree to get job alerts from ' + brand + ' by email, to the lead terms on this page, and to my company name, trade, license number, and business phone being shown on the site.',
+      // Text alerts are a separate, optional opt-in. Carriers check this wording when you register for business texting.
+      sms: 'Text me job alerts from ' + brand + ' at this mobile number. Message frequency varies with requests in my area (often a few a day). Message and data rates may apply. Reply STOP to stop, HELP for help. Agreeing is not required to join.'
     }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = C;

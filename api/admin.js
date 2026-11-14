@@ -1,6 +1,7 @@
 // The owner's admin page (/admin). Every call needs the ADMIN_KEY set in Vercel.
-// GET: contractors, recent requests, lead fees, coverage gaps, and the funnel. POST: approve, pause, or edit a contractor,
-// invite one, cancel a spam request, hide a review, decide lead fees, or run the daily job now.
+// GET: contractors, recent requests, lead fees, coverage gaps, and the funnel. ?view=setup: the launch checklist. ?view=recruit: recruiting.
+// POST: approve, pause, or edit a contractor, invite one, cancel a spam request, hide a review, decide lead fees, run the daily job now,
+// send test messages, and manage the recruiting list.
 // GET ?job=daily is also what Vercel's daily schedule calls, with the CRON_SECRET you set in Vercel.
 const C = require('../lib/config');
 const store = require('../lib/store');
@@ -9,6 +10,9 @@ const E = require('../lib/emails');
 const { wrap, bad, str, requireAdmin, isReady, isPaused } = require('../lib/http');
 const crypto = require('crypto');
 const { daily } = require('../lib/daily');
+const recruit = require('../lib/recruit');
+const setup = require('../lib/setup');
+const sms = require('../lib/sms');
 const isId = v => /^[0-9a-f-]{36}$/i.test(String(v || ''));
 const isCron = headers => {
   const want = process.env.CRON_SECRET ? Buffer.from('Bearer ' + process.env.CRON_SECRET) : null, got = Buffer.from(String(headers.authorization || ''));
@@ -26,6 +30,8 @@ module.exports = wrap({
   async GET({ headers, query }) {
     if (query.job === 'daily') { if (!isCron(headers)) requireAdmin(headers); return daily(); }
     requireAdmin(headers);
+    if (query.view === 'setup') return setup.run();
+    if (query.view === 'recruit') return recruit.view();
     const contractors = await store.allContractors();
     const requests = await store.recentRequests(100);
     const alerts = await store.alertsForRequests(requests.map(r => r.id));
@@ -87,12 +93,39 @@ module.exports = wrap({
       await store.updateContractor(c.id, Object.assign(p, { trades, counties }));
       return { ok: true };
     }
-    if (body.action === 'invite') {
-      // After a recruiting call: email them a sign-up link with their email filled in.
-      const email = str(body.email, 120).toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw bad('Enter a valid email address.');
-      await mail.send(E.invite(email, str(body.name, 80)));
+    // After a recruiting call: email them a sign-up link with their email filled in. Added to the recruiting list so it's tracked.
+    if (body.action === 'invite') return recruit.inviteOne(body.email, body.name, body.trade, body.county);
+    // Recruiting list: add from a file, invite in bulk, or mark after a call.
+    if (body.action === 'prospects_import') return recruit.importRows(body.rows, body.list_name);
+    if (body.action === 'prospects_invite') return recruit.invite(body.ids, body.note);
+    if (body.action === 'prospect_update') return recruit.update(body.id, body);
+    // Launch checklist: prove email and texts really arrive.
+    if (body.action === 'test_email') {
+      const to = str(body.to, 120).toLowerCase() || C.ADMIN_EMAIL;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw bad('Enter the email address to send the test to.');
+      const r = await mail.send(E.testEmail(to));
+      if (!r.ok) throw bad(r.error || 'The test email did not send.', 502);
+      return { ok: true, logged: !!r.logged, to };
+    }
+    if (body.action === 'test_text') {
+      if (!sms.e164(body.to)) throw bad('Enter a 10-digit US mobile number.');
+      const r = await sms.send(body.to, C.brand + ': Test text from your launch checklist. Texting works.');
+      if (!r.ok) throw bad(r.error || 'The test text did not send.', 502);
       return { ok: true };
+    }
+    if (body.action === 'sample_alert') {
+      // What a pro sees for a new request, sent to you. Uses a made-up job; nothing is saved.
+      const to = str(body.email, 120).toLowerCase() || C.ADMIN_EMAIL;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw bad('Enter the email address to send the sample to.');
+      const phone = str(body.phone, 30);
+      if (phone && !sms.e164(phone)) throw bad('Enter a 10-digit US mobile number, or leave it empty.');
+      const fake = { id: 'sample', email: to, mobile: phone, sms_on: !!phone, extra_emails: [], manage_token: 'sample', company: 'Sample Co.' };
+      const req = { service: 'heating', problem: 'no-heat', zip: '07059', county: 'Somerset', timing: 'As soon as possible', system: 'Gas furnace', note: 'Sample request from your launch checklist', photos: [] };
+      const msg = E.contractorAlert(fake, req, { token: 'sample' });
+      msg.subject = '[Sample] ' + msg.subject; msg.textFor = null;
+      const r = await mail.send(msg);
+      if (!r.ok) throw bad(r.error || 'The sample did not send.', 502);
+      return { ok: true, texted: !!phone && sms.on() };
     }
     if (body.action === 'cancel_request') {
       // Spam or a test: close it quietly. Pros who said yes are told it's canceled.

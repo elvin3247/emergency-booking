@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- seo:start -->
+<title>No more emails | YourBrand</title>
+<meta name="robots" content="noindex">
+<!-- seo:end -->
+<!-- head:start -->
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#E9EDF1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+<!-- head:end -->
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="narrow">
+  <div class="stack" id="ask"><h1>Stop recruiting emails?</h1><p class="sub">We'll stop sending invites to this company. This doesn't affect anything else.</p>
+    <div><button class="btn" type="button" id="go">Stop the emails</button></div>
+    <p class="err" id="err" role="alert" hidden></p></div>
+  <div class="notice good" id="done" role="status" hidden></div>
+  <p class="small sub">Changed your mind later? You can still <a href="/contractors">sign up</a> anytime.</p>
+</div></div></main>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+// A button instead of acting on page load, so email scanners that open links can't unsubscribe anyone by accident.
+var inv = new URLSearchParams(location.search).get('inv') || '';
+document.getElementById('go').addEventListener('click', async function () {
+  var go = this, err = document.getElementById('err'), done = document.getElementById('done');
+  err.hidden = true; go.disabled = true; go.textContent = 'Saving...';
+  try { var r = await api('/api/contractors', { action: 'unsubscribe', inv: inv }); done.textContent = 'Done. We won\'t email ' + (r.company || 'you') + ' about joining again.'; done.hidden = false; document.getElementById('ask').hidden = true; }
+  catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Stop the emails'; }
+});
+</script>
+<div id="site-footer"></div>
+</body>
+</html>

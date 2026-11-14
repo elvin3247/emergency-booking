@@ -5,11 +5,13 @@ const fs = require('fs');
 const path = require('path');
 const C = require('../public/assets/config.js');
 const GUIDES = require('./content.js');
+const TRIAGE = require('./triage.js');
 const ZIPS = require('./nj-zips.json'); // { "07059": [countyIndex, "Warren"] }  Source: GeoNames, CC BY 4.0
 const PUB = path.join(__dirname, '..', 'public');
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const base = (C.siteUrl || '').replace(/\/$/, '');
+// Your live address: siteUrl in config.js, or SITE_URL when Vercel runs the build. Without one there is no sitemap or canonical links.
+const base = (C.siteUrl || process.env.SITE_URL || '').replace(/\/$/, '');
 const abs = p => (base ? base + p : '');
 const slug = county => county.toLowerCase().replace(/ /g, '-') + '-county-nj';
 const write = (rel, text) => { const f = path.join(PUB, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
@@ -133,42 +135,57 @@ const HOUSE_ART = `<rect x="0" y="380" width="600" height="140" fill="url(#soil)
 <rect x="262" y="408" width="48" height="84" rx="20" class="eq wh"/><ellipse cx="300" cy="494" rx="34" ry="5" class="puddle"/>
 <rect x="392" y="456" width="56" height="44" class="pit"/><rect x="408" y="462" width="24" height="26" rx="3" class="eq pl"/>
 <rect x="508" y="336" width="78" height="44" rx="4" class="eq cl"/><circle cx="547" cy="358" r="14" class="fan"/>`;
-const houseSection = () => {
-  const probHref = p => '/request?s=' + C.problems[p][2][0] + '&amp;p=' + p;
-  // Groups: heating and cooling share one list; every other live service gets its own.
-  const groups = [];
+// Service pages beyond the trade pages: water heaters get their own county pages, since people search for them on their own.
+// Each one uses its trade's pros (water heaters: plumbers) for live coverage.
+const SVC_PAGES = {
+  'water-heater': { slug: 'water-heater', name: 'Water heaters', h1: 'Emergency water heater repair', what: 'water heater repair', ask: 'No hot water, or a leaking tank?', pros: 'water heater pros', who: 'plumbing or water heater company' }
+};
+const LIVE_SVC_PAGES = Object.keys(SVC_PAGES).filter(k => C.services[k] && C.services[k].live);
+// Where a group of problems lists its pros by county: its own service pages if it has them, otherwise its trade's.
+const hubFor = k => LIVE_SVC_PAGES.includes(k) ? ['/' + SVC_PAGES[k].slug, SVC_PAGES[k].name + ' by county'] : C.services[k].trade === 'hvac' ? ['/hvac', 'HVAC pros by county'] : ['/' + C.trades[C.services[k].trade].slug, cap(C.trades[C.services[k].trade].pros) + ' by county'];
+
+// Live problems, grouped the way homeowners think: heating and cooling together, every other service on its own.
+function problemGroups() {
+  const groups = [], order = Object.keys(C.problems);
   SERVICES.filter(k => C.services[k].live).forEach(k => {
-    const t = C.services[k].trade;
-    const name = t === 'hvac' ? 'Heating and cooling' : C.services[k].name;
+    const t = C.services[k].trade, name = t === 'hvac' ? 'Heating and cooling' : C.services[k].name;
     let g = groups.find(x => x.name === name);
-    if (!g) groups.push(g = { name, k, hub: '/' + t, hubText: t === 'hvac' ? 'HVAC pros by county' : k === 'plumbing' ? 'Plumbers by county' : C.services[k].name + ' pros by county', probs: [] });
-    Object.keys(C.problems).forEach(p => { if (p !== 'other' && C.problems[p][2][0] === k && !g.probs.includes(p)) g.probs.push(p); });
+    if (!g) { const hub = hubFor(k); groups.push(g = { name, k, hub: hub[0], hubText: hub[1], probs: [] }); }
+    order.forEach(p => { if (p !== 'other' && C.problems[p][2][0] === k && !g.probs.includes(p)) g.probs.push(p); });
   });
-  const order = Object.keys(C.problems);
   groups.forEach(g => g.probs.sort((a, z) => order.indexOf(a) - order.indexOf(z)));
+  return groups;
+}
+const probHref = p => '/request?s=' + C.problems[p][2][0] + '&amp;p=' + p;
+// The cutaway drawing. pinHref decides where a pin goes: the request form on the home page, the problem's section on the guide.
+function houseSvg(probs, pinHref, id) {
+  const pins = probs.filter(p => PINS[p]).map(p => {
+    const [ox, oy, x, y] = PINS[p];
+    return '<a href="' + pinHref(p) + '" class="pin t-' + C.problems[p][2][0] + '" data-k="' + p + '" data-x="' + x + '" data-y="' + y + '" aria-label="' + esc(C.problems[p][0]) + '"><line x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" class="lead"/><circle cx="' + ox + '" cy="' + oy + '" r="3" class="anchor"/><circle cx="' + x + '" cy="' + y + '" r="11" class="ring"/><circle cx="' + x + '" cy="' + y + '" r="4" class="dot"/></a>';
+  }).join('');
+  return `<svg class="house" viewBox="0 0 600 520" role="img" aria-labelledby="${id}-t"><title id="${id}-t">Cutaway of a house showing where each problem happens</title><defs><pattern id="${id}-soil" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" class="hatch"/></pattern></defs>
+${HOUSE_ART.replace('url(#soil)', 'url(#' + id + '-soil)')}
+${pins}</svg>
+          <p class="flag" aria-hidden="true"></p>
+          <p class="tip">Hover or tap a spot to see the problem.</p>`;
+}
+const houseSection = () => {
+  const groups = problemGroups();
   const rows = groups.map(g => '<div class="hg t-' + g.k + '"><h3>' + esc(g.name) + '</h3><ul>' +
     g.probs.map(p => '<li><a href="' + probHref(p) + '" data-k="' + p + '"><b>' + esc(C.problems[p][0]) + '</b><span>' + esc(C.problems[p][1]) + '</span></a></li>').join('') +
     '</ul><a class="hub" href="' + g.hub + '">' + esc(g.hubText) + '</a></div>').join('\n          ');
-  const pins = groups.flatMap(g => g.probs).filter(p => PINS[p]).map(p => {
-    const [ox, oy, x, y] = PINS[p];
-    return '<a href="' + probHref(p) + '" class="pin t-' + C.problems[p][2][0] + '" data-k="' + p + '" data-x="' + x + '" data-y="' + y + '" aria-label="' + esc(C.problems[p][0]) + '"><line x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" class="lead"/><circle cx="' + ox + '" cy="' + oy + '" r="3" class="anchor"/><circle cx="' + x + '" cy="' + y + '" r="11" class="ring"/><circle cx="' + x + '" cy="' + y + '" r="4" class="dot"/></a>';
-  }).join('');
   const soon = SERVICES.filter(k => !C.services[k].live).map(k => C.services[k].name.toLowerCase());
-  return `<div class="hx">
+  return `<div class="hx" data-house>
         <div class="hx-text">
           <h2>Where in the house?</h2>
           <p class="sub">Point to the trouble. Every spot is a problem our pros fix, and each one opens a request with it filled in.</p>
           <div class="hlist">
           ${rows}
           </div>
-          ${soon.length ? '<p class="soon">' + esc(list(soon).replace(/^./, c => c.toUpperCase())) + ' ' + (soon.length > 1 ? 'are' : 'is') + ' coming soon. Not sure it needs a visit? Try our <a href="/help">quick checks</a> first.</p>' : '<p class="soon">Not sure it needs a visit? Try our <a href="/help">quick checks</a> first.</p>'}
+          <p class="soon">${soon.length ? esc(list(soon).replace(/^./, c => c.toUpperCase())) + ' ' + (soon.length > 1 ? 'are' : 'is') + ' coming soon. ' : ''}Not sure how urgent it is? <a href="/whats-wrong">See what to do first for each problem</a>.</p>
         </div>
         <div class="hx-art">
-          <svg class="house" viewBox="0 0 600 520" role="img" aria-labelledby="hs-t"><title id="hs-t">Cutaway of a house showing where each problem happens</title><defs><pattern id="soil" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" class="hatch"/></pattern></defs>
-${HOUSE_ART}
-${pins}</svg>
-          <p class="flag" id="hx-flag" aria-hidden="true"></p>
-          <p class="tip">Hover or tap a spot to see the problem.</p>
+          ${houseSvg(groups.flatMap(g => g.probs), probHref, 'hs')}
         </div>
       </div>`;
 };
@@ -207,7 +224,8 @@ LIVE_TRADES.forEach(trade => {
   const T = C.trades[trade], K = COPY[trade], root = '/' + T.slug, first = servicesOf(trade).find(k => C.services[k].live);
   C.counties.forEach(county => {
     const p = root + '/' + slug(county), mine = towns[county] || {}, names = Object.keys(mine).sort();
-    const also = LIVE_TRADES.filter(t => t !== trade).map(t => '<a href="/' + C.trades[t].slug + '/' + slug(county) + '">' + esc(C.trades[t].name) + '</a>').join('');
+    const also = LIVE_SVC_PAGES.filter(k => C.services[k].trade === trade).map(k => '<a href="/' + SVC_PAGES[k].slug + '/' + slug(county) + '">' + esc(SVC_PAGES[k].name) + '</a>').join('') +
+      LIVE_TRADES.filter(t => t !== trade).map(t => '<a href="/' + C.trades[t].slug + '/' + slug(county) + '">' + esc(C.trades[t].name) + '</a>').join('');
     const m = {
       path: p,
       title: cap(K.h1) + ' in ' + county + ' County, NJ: See Who Can Come',
@@ -279,6 +297,173 @@ LIVE_TRADES.forEach(trade => {
     </div>
   </section>`));
 });
+
+// ---- Service county pages: /water-heater/<county>-county-nj and the /water-heater index ----
+// Same booking flow as the trade pages, with what to do first for that service. Live coverage uses the trade's pros.
+Object.keys(SVC_PAGES).filter(k => !LIVE_SVC_PAGES.includes(k)).forEach(k => { fs.rmSync(path.join(PUB, SVC_PAGES[k].slug), { recursive: true, force: true }); fs.rmSync(path.join(PUB, SVC_PAGES[k].slug + '.html'), { force: true }); });
+LIVE_SVC_PAGES.forEach(k => {
+  const S = SVC_PAGES[k], root = '/' + S.slug, trade = C.services[k].trade, T = C.trades[trade];
+  const probs = problemsOf(k).filter(p => p !== 'other' && C.problems[p][2][0] === k);
+  const rowsFor = county => probs.map(p => {
+    const P = C.problems[p], q = '/request?s=' + k + '&amp;p=' + p + (county ? '&amp;county=' + encodeURIComponent(county) : '');
+    return '<div class="r"><a class="main" href="' + q + '"><b>' + esc(P[0]) + '</b><span>' + esc(P[1]) + '</span></a>' + (GUIDES[p] ? '<a class="quick" href="/help/' + p + '">Quick checks</a>' : '') + '<a class="arrow" href="' + q + '" aria-label="Request help: ' + esc(P[0]) + '">&rarr;</a></div>';
+  }).join('\n        ');
+  // What to do first, from the triage guide.
+  const firstAid = probs.filter(p => TRIAGE.problems[p]).map(p => {
+    const t = TRIAGE.problems[p];
+    return '<div class="card"><h3>' + esc(C.problems[p][0]) + '</h3><p class="sub"><b>Call now if:</b> ' + esc(t.now.join(' ')) + '</p><p class="sub"><b>Usually can wait:</b> ' + esc(t.wait) + '</p><p class="sub"><b>First:</b> ' + esc(t.first.join(' ')) + '</p></div>';
+  }).join('');
+  C.counties.forEach(county => {
+    const p = root + '/' + slug(county), mine = towns[county] || {}, names = Object.keys(mine).sort();
+    const near = (C.neighbors[county] || []).map(n => '<a href="' + root + '/' + slug(n) + '">' + esc(n) + '</a>').join('');
+    const m = {
+      path: p,
+      title: cap(S.h1) + ' in ' + county + ' County, NJ: See Who Can Come',
+      desc: S.ask + ' Licensed pros who cover ' + county + ' County and are free reply with an arrival time and visit fee. Free for homeowners, open 24/7.',
+      ld: [
+        { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency ' + S.what, name: S.h1 + ' in ' + county + ' County, NJ', provider: org(), areaServed: { '@type': 'AdministrativeArea', name: county + ' County, New Jersey' } },
+        crumbsLd([['Home', '/'], [S.name, root], [county + ' County']])
+      ]
+    };
+    write(S.slug + '/' + slug(county) + '.html', shell(m, `  <section class="hero sm">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${root}">${esc(S.name)}</a> / ${esc(county)} County</nav>
+      <h1>${esc(S.h1)} in ${esc(county)} County, NJ</h1>
+      <p class="lede">${esc(S.ask)} Tell us what's going on. Licensed pros who cover ${esc(county)} County and are free reply with an arrival time and visit fee. You pick one.</p>
+      ${bookBar({ county, service: k })}
+    </div>
+  </section>
+  <section class="sec">
+    <div class="wrap">
+      <h2>What's wrong with the water heater?</h2>
+      <div class="rows">
+        ${rowsFor(county)}
+      </div>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="wrap">
+      <h2>Before the pro arrives</h2>
+      <p class="sub">What can't wait, what usually can, and what to do first. If you smell gas, leave the house and call 911 or your gas utility from outside.</p>
+      <div class="two">${firstAid}</div>
+      <p class="sub">Helpful to have ready: whether the tank is gas or electric, its size in gallons, and the brand and age from the label.</p>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="wrap two">
+      <div class="stack">
+        <h2>Pros in ${esc(county)} County</h2>
+        <div class="stack" data-county-pros="${esc(county)}" data-trade="${trade}"><p class="sub">Checking who's signed up...</p></div>
+        <p class="sub">Run a ${esc(S.who)} in ${esc(county)} County? <a href="/contractors">Apply to get emergency requests here.</a></p>
+        <p class="also"><span class="sub">Also in ${esc(county)} County:</span><a href="/${T.slug}/${slug(county)}">${esc(T.name)}</a>${LIVE_TRADES.filter(t => t !== trade).map(t => '<a href="/' + C.trades[t].slug + '/' + slug(county) + '">' + esc(C.trades[t].name) + '</a>').join('')}</p>
+        ${near ? '<p class="also"><span class="sub">Nearby counties:</span>' + near + '</p>' : ''}
+      </div>
+      <div class="stack">
+        <h2>Towns we cover</h2>
+        <p class="sub">Every ${esc(county)} County ZIP code can send a request.</p>
+        <ul class="towns">${names.map(n => '<li>' + esc(n) + ' <span>' + mine[n].join(', ') + '</span></li>').join('')}</ul>
+      </div>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="wrap">
+      <h2>How it works</h2>
+      ${HOW}
+      <p class="sub" style="margin-top:20px">No one free within ${C.windowMin} minutes? We say so and show pros you can call directly.</p>
+    </div>
+  </section>`, { bodyClass: 'inner', sticky: true }));
+  });
+  write(S.slug + '.html', shell({
+    path: root, title: cap(S.h1) + ' by County in New Jersey',
+    desc: S.ask + ' See where licensed pros are taking emergency water heater requests right now, in all 21 New Jersey counties.',
+    ld: [crumbsLd([['Home', '/'], [S.name]])]
+  }, `  <section class="hero sm">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / ${esc(S.name)}</nav>
+      <h1>${esc(S.h1)} across New Jersey</h1>
+      <p class="lede">${esc(S.ask)} Pick your county to see who's on call, or send a request now and licensed pros nearby answer with a time and a price.</p>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="wrap">
+      ${LEGEND}
+      <div class="counties" data-trade="${trade}">
+        ${C.counties.map(c => '<a href="' + root + '/' + slug(c) + '" data-cov="' + esc(c) + '"><i class="dot"></i>' + esc(c) + '</a>').join('\n        ')}
+      </div>
+      <p class="sub" style="margin-top:20px">Don't see your county lit up? <a href="/request?s=${k}">Send a request anyway</a> and we'll tell you right away what we can do.</p>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="wrap">
+      <h2>What's wrong with the water heater?</h2>
+      <div class="rows">
+        ${rowsFor('')}
+      </div>
+    </div>
+  </section>`));
+});
+
+// ---- The "What's wrong?" guide: /whats-wrong ----
+// Every live problem, grouped by where it happens in the house, with when it can't wait and what to do first.
+(function () {
+  const live = problemGroups().flatMap(g => g.probs).filter(p => TRIAGE.problems[p]);
+  const svc = p => C.problems[p][2][0];
+  const section = a => {
+    const here = live.filter(p => TRIAGE.problems[p].area === a.key);
+    if (!here.length) return '';
+    return `  <section class="sec" id="${a.key}">
+    <div class="wrap">
+      <h2>${esc(a.name)}</h2>
+      <p class="sub">${esc(a.intro)}</p>
+      <div class="triage">
+        ${here.map(p => {
+          const t = TRIAGE.problems[p], hub = hubFor(svc(p));
+          return '<article class="tri t-' + svc(p) + '" id="' + p + '"><h3>' + esc(C.problems[p][0]) + '</h3><p class="sub">' + esc(C.problems[p][1]) + '.</p>' +
+            '<div class="tri-now"><b>Call a pro now if</b><ul>' + t.now.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' +
+            '<p class="tri-wait"><b>Usually can wait:</b> ' + esc(t.wait) + '</p>' +
+            '<div class="tri-first"><b>Do this first</b><ol>' + t.first.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol></div>' +
+            '<p class="tri-links"><a class="btn sm" href="' + probHref(p) + '">Get help with this now</a>' + (GUIDES[p] ? '<a href="/help/' + p + '">All quick checks</a>' : '') + '<a href="' + hub[0] + '">' + esc(hub[1]) + '</a></p></article>';
+        }).join('\n        ')}
+      </div>
+    </div>
+  </section>`;
+  };
+  const toc = TRIAGE.areas.filter(a => live.some(p => TRIAGE.problems[p].area === a.key)).map(a => '<li><b><a href="#' + a.key + '">' + esc(a.name) + '</a></b><ul>' + live.filter(p => TRIAGE.problems[p].area === a.key).map(p => '<li><a href="#' + p + '" data-k="' + p + '"><b>' + esc(C.problems[p][0]) + '</b></a></li>').join('') + '</ul></li>').join('');
+  write('whats-wrong.html', shell({
+    path: '/whats-wrong', title: "What's Wrong? A Room-by-Room Guide to Home Repair Emergencies",
+    desc: 'No heat, a burst pipe, a leaking water heater, or a sump pump that stopped? Find the problem by where it is in the house, see if it can wait, and what to do first.',
+    ld: [
+      Object.assign({ '@context': 'https://schema.org', '@type': 'Article', headline: "What's wrong? A room-by-room guide to home repair emergencies", author: org(), publisher: org() }, base ? { mainEntityOfPage: abs('/whats-wrong') } : {}),
+      crumbsLd([['Home', '/'], ["What's wrong?"]])
+    ]
+  }, `  <section class="hero sm">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / What's wrong?</nav>
+      <h1>What's wrong? Find it by where it is.</h1>
+      <p class="lede">Pick the spot in the house. For each problem: when it can't wait, when it usually can, and the safe first steps while help is on the way.</p>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="wrap">
+      <div class="notice crit"><b>Smell gas, see smoke, or is a carbon monoxide alarm sounding?</b> Leave the house now, then call 911 or your gas utility from outside.</div>
+      <div class="hx guide-map" data-house>
+        <div class="hx-text"><h2>Jump to a problem</h2><ul class="toc">${toc}</ul></div>
+        <div class="hx-art">
+          ${houseSvg(live, p => '#' + p, 'ww')}
+        </div>
+      </div>
+    </div>
+  </section>
+${TRIAGE.areas.map(section).join('\n')}
+  <section class="sec">
+    <div class="wrap">
+      <h2>Need someone now?</h2>
+      <p class="lede" style="margin-bottom:16px">Licensed New Jersey pros who are free reply with an arrival time and visit fee. Free for homeowners.</p>
+      ${bookBar({}).replace('class="book"', 'class="book solo"')}
+      <p class="small sub" style="margin-top:16px">This guide is general information, not a diagnosis. If anything seems unsafe, stop and call a licensed professional.</p>
+    </div>
+  </section>`, { bodyClass: 'inner', sticky: true }));
+})();
 
 // ---- Troubleshooting guides: /help/<problem> ----
 const li = arr => arr.map(x => '<li>' + esc(x) + '</li>').join('');
@@ -355,6 +540,7 @@ const PAGES = {
   'admin.html': { title: 'Admin', noindex: true },
   'company.html': { title: 'Company profile', noindex: true },
   'find.html': { title: 'Find your request', noindex: true },
+  'unsubscribe.html': { title: 'No more emails', noindex: true },
   '404.html': { title: 'Page not found', noindex: true }
 };
 const block = (html, name, inner) => {
@@ -391,7 +577,7 @@ Object.keys(PAGES).forEach(file => {
 
 // ---- ZIP lookup for the browser, robots.txt, sitemap.xml ----
 write('assets/nj-zips.js', '// New Jersey ZIP codes: [county index in SITE.counties, place name]. Data from GeoNames (geonames.org), CC BY 4.0.\nwindow.NJ_ZIPS=' + JSON.stringify(ZIPS) + ';\n');
-write('robots.txt', 'User-agent: *\nDisallow: /api/\nDisallow: /status\nDisallow: /respond\nDisallow: /pro\nDisallow: /admin\n' + (base ? 'Sitemap: ' + abs('/sitemap.xml') + '\n' : ''));
+write('robots.txt', 'User-agent: *\nDisallow: /api/\nDisallow: /status\nDisallow: /respond\nDisallow: /pro\nDisallow: /admin\nDisallow: /unsubscribe\n' + (base ? 'Sitemap: ' + abs('/sitemap.xml') + '\n' : ''));
 if (base) write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + sitemap.sort().map(p => '  <url><loc>' + abs(p) + '</loc></url>').join('\n') + '\n</urlset>\n');
 else if (fs.existsSync(path.join(PUB, 'sitemap.xml'))) fs.unlinkSync(path.join(PUB, 'sitemap.xml'));
 

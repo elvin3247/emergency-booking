@@ -142,6 +142,38 @@ create table if not exists link_sends (
 create index if not exists link_sends_created_idx on link_sends(created_at);
 alter table link_sends enable row level security;
 
+-- Text alerts for pros (safe to run again). Pros opt in separately from email; carriers require that.
+alter table contractors add column if not exists sms_on boolean not null default false;
+alter table contractors add column if not exists sms_consent_at timestamptz;
+alter table contractors add column if not exists sms_consent_text text;
+alter table contractors add column if not exists sms_off_reason text;           -- why texts stopped: they replied STOP, not a mobile, or turned off
+
+-- Recruiting: companies you plan to invite, and what happened (safe to run again).
+create table if not exists prospects (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  company text not null,
+  contact text,
+  email text unique,
+  phone text,
+  trades text[] not null default '{}',
+  counties text[] not null default '{}',
+  town text,
+  website text,
+  license text,
+  notes text,
+  list_name text,                      -- which list you uploaded it from
+  token text not null unique,          -- private code in their invite link and "no thanks" link
+  invited_at timestamptz,
+  invite_count integer not null default 0,
+  clicked_at timestamptz,              -- opened the sign-up page from an invite
+  contractor_id uuid,                  -- set when they apply
+  unsubscribed_at timestamptz,         -- asked for no more emails; never invite again
+  not_interested boolean not null default false   -- you marked them after a call
+);
+create index if not exists prospects_created_idx on prospects(created_at desc);
+alter table prospects enable row level security;
+
 -- Private bucket for request photos. Only the server can read or write it.
 insert into storage.buckets (id, name, public) values ('photos', 'photos', false) on conflict (id) do nothing;
 

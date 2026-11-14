@@ -131,5 +131,53 @@ module.exports = {
     ],
     stop: ['You smell gas near the water heater. Leave and call 911 or your gas utility from outside.', 'The breaker trips a second time.', 'The pilot will not stay lit.', 'You see water, rust streaks, or scorch marks on the tank.'],
     meanwhile: ['Do not turn the temperature dial to its highest setting to make up for it.', 'If the tank is leaking, shut the cold water valve on the pipe above it.', 'Note the brand and the age on the label for the plumber.']
+  },
+  'toilet': {
+    title: 'Toilet overflowing or running? What to do right now',
+    h1: 'Toilet overflowing or running? Do this first',
+    desc: 'Stop an overflowing toilet in seconds, then five safe checks for a toilet that runs, will not flush, or keeps clogging, and when to call a licensed New Jersey plumber.',
+    intro: 'An overflowing toilet is scary, but you can stop the water in a few seconds. Most running or weak-flush problems are a flapper, a chain, or a float you can see under the tank lid.',
+    checks: [
+      ['Stop the water', 'Turn the shutoff valve on the wall behind the toilet clockwise until it stops. No valve, or it will not turn? Lift the tank lid and pull the float up to stop the fill.'],
+      ['Do not flush again', 'A second flush on a clogged toilet sends more water over the rim. Wait until the bowl drains down on its own.'],
+      ['Try a plunger the right way', 'Use a flange plunger (the kind with a sleeve on the bottom). Seal it over the hole and push and pull firmly about ten times, keeping it under water.'],
+      ['Look in the tank for a running toilet', 'If it runs nonstop, check whether the chain is tangled or the rubber flapper is not sealing. Straighten the chain so it has a little slack.'],
+      ['Check the water level', 'Water spilling into the tall tube in the middle of the tank means the float is set too high. Bending or adjusting the float down usually stops it.'],
+      ['Check other drains', 'If only this toilet is slow, the clog is in the toilet. If tubs and sinks are slow too, the problem is further down the line.']
+    ],
+    stop: ['Water or sewage comes up in a tub, shower, or floor drain when you flush or run water.', 'The shutoff valve leaks or breaks when you turn it.', 'Water is leaking from the base of the toilet onto the floor.', 'Plunging does not clear it after a few tries.'],
+    meanwhile: ['Leave the supply valve off until the problem is fixed.', 'Use another bathroom, and if several drains are backing up, stop running water in the house.', 'Wipe up overflow water quickly and keep kids and pets away from it.']
+  },
+  'sump': {
+    title: 'Sump pump not working? 6 checks before water rises',
+    h1: 'Sump pump not working? Check these first',
+    desc: 'Water rising in the sump pit or the basement? Six safe checks for a sump pump that will not run or keeps running, and when to call a licensed New Jersey plumber fast.',
+    intro: 'When it is raining, a stopped sump pump is urgent. Many failures are a tripped outlet or a stuck float switch, which you can check in a few minutes without tools.',
+    checks: [
+      ['Stay out of standing water', 'If water has reached outlets, cords, or the furnace, do not step in it. Shut off power to the basement at the panel only if you can reach it from a dry spot, or wait for a pro.'],
+      ['Check the outlet', 'Most pumps plug into an outlet with Test and Reset buttons. Press Reset. If there is no power, check the breaker panel for a tripped breaker.'],
+      ['Check the plug', 'Make sure the pump is plugged in firmly. Some pumps have two plugs stacked together, one for the switch and one for the pump.'],
+      ['Look at the float', 'The float is the part that rises with the water and turns the pump on. If it is stuck against the side of the pit or tangled in the cord, gently free it.'],
+      ['Listen for humming', 'A pump that hums but does not move water may be jammed or clogged. Unplug it before you look, and call a pro if it is stuck.'],
+      ['Check the outside pipe', 'Find where the discharge pipe ends outside. If it is frozen, buried, or blocked, the water has nowhere to go.']
+    ],
+    stop: ['Water is rising and the pump will not run after you reset the outlet.', 'Water is near outlets, cords, the furnace, or the water heater.', 'The breaker trips again when the pump turns on.', 'The pump runs constantly but the water level does not drop.'],
+    meanwhile: ['Move belongings, boxes, and anything electrical up off the basement floor.', 'Cut back on water use: skip laundry, the dishwasher, and long showers, since that water drains to the pit in some homes.', 'If you have a wet vac, you can lower the pit while you wait, as long as you are not standing in water.']
+  },
+  'wh-leak': {
+    title: 'Water heater leaking? What to shut off and when to call',
+    h1: 'Water heater leaking? Do this first',
+    desc: 'Water under or around your water heater? How to shut off the water and power safely, how to tell a small drip from a failing tank, and when to call a licensed New Jersey plumber.',
+    intro: 'Not every puddle near a water heater means the tank is done. But a tank leaking from the bottom is failing, so it is worth shutting things off now and finding out.',
+    checks: [
+      ['Shut the cold water valve', 'Find the pipe going into the top of the tank marked cold. Turn its valve clockwise, or turn a lever handle so it sits across the pipe. This stops more water from entering.'],
+      ['Turn off the heat', 'Electric tank: switch off its breaker. Gas tank: turn the gas control knob to Off or Pilot. Do not touch anything if you smell gas.'],
+      ['Find where the water comes from', 'Dry the area and watch. A drip from a pipe fitting above the tank is often a simple repair. Water from under the tank usually means the tank itself is failing.'],
+      ['Check the relief valve pipe', 'A pipe runs down the side from a valve near the top. If water drips from its end, the valve may be releasing pressure. That needs a plumber, but it is not an empty-the-house emergency.'],
+      ['Rule out other sources', 'Check for condensation on cold pipes, a nearby furnace or AC drain line, or a washing machine hose before blaming the heater.'],
+      ['Note the label', 'Write down the brand and the age printed on the label. It helps the plumber bring the right parts or a replacement quote.']
+    ],
+    stop: ['Water is coming from the bottom of the tank.', 'The leak does not stop after you shut the cold water valve.', 'You smell gas, see scorch marks, or the tank is making popping or rumbling sounds with a leak.', 'Water is spreading toward outlets, the furnace, or finished floors.'],
+    meanwhile: ['Keep the heat off while it leaks. A tank with no water in it can be damaged if it keeps heating.', 'Put towels or a pan down and move anything stored nearby.', 'Do not try to drain the tank yourself unless you are sure how. The water inside can scald.']
   }
 };

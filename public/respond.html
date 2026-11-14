@@ -99,6 +99,8 @@ function render(msg) {
   if (msg) { var e = document.getElementById('err'); if (e) { e.textContent = msg; e.hidden = false; } }
 }
 async function load() {
+  // The sample alert from the admin launch checklist points here.
+  if (t === 'sample') { clearInterval(poll); app.innerHTML = '<div class="notice good"><b>This is a sample.</b> A real alert opens the job page here, where the pro picks an arrival time and says yes.</div>'; return; }
   try { D = await api('/api/alerts?t=' + encodeURIComponent(t || '')); if (!busy) render(); if (['chosen', 'chosen_canceled', 'filled', 'closed', 'no_show', 'canceled'].includes(D.state)) clearInterval(poll); }
   catch (e) { if (!D) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div>'; clearInterval(poll); } }
 }
