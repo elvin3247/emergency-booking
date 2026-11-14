@@ -43,13 +43,40 @@ function settingsForm(first) {
     '<div><button class="btn" type="submit" id="go">' + (first ? 'Finish setup' : 'Save changes') + '</button></div></form>';
 }
 
+var day = function (iso) { return new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+var showAll = false, pauseAsk = new URLSearchParams(location.search).get('pause') === 'night';
+// Every lead you've been sent, newest first. Customer details stay on each job's own page.
+function jobsCard() {
+  var J = D.jobs || [], won = J.filter(function (j) { return /^Won/.test(j.status); }).length;
+  var owed = J.filter(function (j) { return j.lead_fee > 0 && !j.paid && !j.fee_review; }).reduce(function (t, j) { return t + j.lead_fee; }, 0);
+  var list = showAll ? J : J.slice(0, 8);
+  var h = '<div class="card"><div class="split"><h2>Your jobs</h2><span class="sub small">' + J.length + ' sent to you · ' + won + ' won' + (SITE.freeLaunch ? '' : ' · $' + owed + ' in lead fees open') + '</span></div>';
+  if (!J.length) return h + '<p class="sub">No requests yet. They\'ll show up here as they come in.</p></div>';
+  h += '<div class="jobs">' + list.map(function (j) {
+    var fee = j.lead_fee > 0 ? (j.paid ? 'Lead fee $' + j.lead_fee + ', paid' : j.fee_review ? 'Lead fee under review' : 'Lead fee $' + j.lead_fee + ', open') : (/^Won/.test(j.status) ? 'Free lead' : '');
+    return '<div class="job"><div><b>' + esc((SITE.problems[j.problem] || [j.problem])[0]) + '</b><span class="sub small">' + esc(j.county) + ' County, ' + esc(j.zip) + ' · ' + day(j.at) + (j.arrival ? ' · You offered ' + esc(j.arrival) + ', $' + esc(j.visit_fee) : '') + '</span></div>' +
+      '<div class="right"><span class="pill ' + j.tone + '">' + esc(j.status) + '</span>' + (fee ? '<span class="small sub">' + fee + '</span>' : '') + '<a class="small" href="/respond?t=' + encodeURIComponent(j.token) + '">Open job</a></div></div>';
+  }).join('') + '</div>';
+  if (J.length > 8) h += '<div><button class="quiet" type="button" data-all>' + (showAll ? 'Show fewer' : 'Show all ' + J.length) + '</button></div>';
+  return h + '</div>';
+}
+// What homeowners see when they tap "See profile", plus who else gets your alerts.
+function profileForm() {
+  var x = D.extra_emails || [];
+  return '<form class="card" id="pf" novalidate><h2>Your public profile</h2><p class="small sub">Homeowners can open this before choosing you. <a href="/company?id=' + encodeURIComponent(D.id) + '" target="_blank" rel="noopener">See how it looks</a></p>' +
+    '<div><label for="about">About your company</label><textarea id="about" maxlength="600" placeholder="What you specialize in, how long you\'ve served the area, anything that sets you apart">' + esc(D.about) + '</textarea></div>' +
+    '<div class="row"><div><label for="years">Years in business</label><input type="number" id="years" min="0" max="150" inputmode="numeric" value="' + esc(D.years_in_business == null ? '' : D.years_in_business) + '"></div>' +
+    '<div><label for="website">Website (optional)</label><input type="text" id="website" inputmode="url" autocapitalize="off" value="' + esc(D.website) + '"></div></div>' +
+    '<div><label for="extra">Also send alerts to (optional)</label><input type="text" id="extra" inputmode="email" autocapitalize="off" placeholder="dispatch@yourcompany.com" value="' + esc(x.join(', ')) + '"><p class="small sub" style="margin-top:4px">Up to 3 more emails, separated by commas. Good for a dispatcher or office manager.</p></div>' +
+    '<p class="err" id="perr" role="alert" hidden></p><div><button class="btn" type="submit" id="pgo">Save profile</button></div></form>';
+}
 function render() {
   var h = '';
   if (!D.setup_complete) {
     h = '<div class="stack"><p class="eyebrow">Step 2 of 2</p><h1>Finish your setup</h1><p class="sub">Two details and you\'re done. Customers see both before they choose you.</p></div>' + settingsForm(true);
   } else {
     var paused = !!D.paused_until, pending = D.status !== 'approved';
-    h = '<div class="stack"><p class="eyebrow">' + esc(D.company) + '</p><h1>Your alerts</h1></div>';
+    h = '<div class="stack"><p class="eyebrow">' + esc(D.company) + '</p><h1>Your jobs and alerts</h1></div>';
     h += pending
       ? '<div class="notice warn"><b>We\'re checking your New Jersey license.</b> Requests start once you\'re approved. We\'ll email ' + esc(D.email) + '.</div>'
       : paused
@@ -57,6 +84,9 @@ function render() {
         : D.in_hours
           ? '<div class="notice good"><b>You\'re on call.</b> Requests in ' + D.counties.length + ' ' + (D.counties.length === 1 ? 'county' : 'counties') + ' go to ' + esc(D.email) + '.</div>'
           : '<div class="notice warn"><b>Outside your alert hours right now.</b> Requests start again at your set hours: ' + esc(SITE.alertHours[D.alert_hours]) + '.</div>';
+    // Came from "Pause alerts until 7am" in an alert email: one tap to confirm.
+    if (pauseAsk && !paused) h += '<div class="card" style="border-color:var(--accent)"><h2>Pause alerts until 7am?</h2><p class="sub">You won\'t get new requests tonight. They start again at 7am.</p><div class="btns"><button class="btn" type="button" data-pause="morning">Yes, pause until 7am</button><button class="btn ghost" type="button" data-noask>Not now</button></div></div>';
+    h += jobsCard();
     h += '<div class="card"><h2>' + (paused ? 'Ready to take jobs?' : 'Taking a break?') + '</h2>' +
       (paused
         ? '<div><button class="btn" type="button" data-pause="resume">Resume alerts now</button></div>'
@@ -64,8 +94,8 @@ function render() {
           '<button class="btn ghost" type="button" data-pause="morning">Until 7am</button>' +
           '<button class="btn ghost" type="button" data-pause="monday">Until Monday 7am</button>' +
           '<button class="btn ghost" type="button" data-pause="off">Until I turn them back on</button></div>') + '</div>';
-    h += '<p class="sub">' + (D.free_leads_left > 0 ? 'Free leads left: <b>' + D.free_leads_left + '</b>. After that, $' + SITE.leadFee + ' only when a customer chooses you.' : 'You pay $' + SITE.leadFee + ' only when a customer chooses you.') + '</p>';
-    h += '<h2>Your settings</h2>' + settingsForm(false);
+    h += '<p class="sub">' + (SITE.freeLaunch ? 'No lead fees during our launch. If that ever changes, we\'ll email you at least 30 days ahead.' : D.free_leads_left > 0 ? 'Free leads left: <b>' + D.free_leads_left + '</b>. After that, $' + SITE.leadFee + ' only when a customer chooses you.' : 'You pay $' + SITE.leadFee + ' only when a customer chooses you.') + '</p>';
+    h += profileForm() + '<h2>Your settings</h2>' + settingsForm(false);
     h += '<p class="small sub">Keep this page private. Anyone with the link can change your settings.</p>';
   }
   app.innerHTML = h;
@@ -75,6 +105,8 @@ async function load() {
   catch (e) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div>'; }
 }
 app.addEventListener('click', async function (e) {
+  if (e.target.closest('[data-all]')) { showAll = !showAll; render(); return; }
+  if (e.target.closest('[data-noask]')) { pauseAsk = false; render(); return; }
   var b = e.target.closest('[data-pause]'); if (!b) return;
   document.querySelectorAll('[data-pause]').forEach(function (x) { x.disabled = true; });
   try { D = await api('/api/pro', { t: t, action: 'pause', until: b.dataset.pause }); render(); toast(D.paused_until ? 'Alerts paused.' : 'Alerts are back on.'); window.scrollTo(0, 0); }
@@ -82,6 +114,13 @@ app.addEventListener('click', async function (e) {
 });
 app.addEventListener('submit', async function (e) {
   e.preventDefault();
+  if (e.target.id === 'pf') {
+    var pe = document.getElementById('perr'), pg = document.getElementById('pgo'), val = function (id) { return document.getElementById(id).value.trim(); };
+    pe.hidden = true; pg.disabled = true; pg.textContent = 'Saving...';
+    try { D = await api('/api/pro', { t: t, action: 'profile', about: val('about'), years_in_business: val('years'), website: val('website'), extra_emails: val('extra').split(/[\s,;]+/).filter(Boolean) }); render(); toast('Profile saved.'); }
+    catch (x) { pe.textContent = x.message; pe.hidden = false; pg.disabled = false; pg.textContent = 'Save profile'; }
+    return;
+  }
   var first = !D.setup_complete, v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
   var body = { t: t, action: 'settings', visit_fee: v('visit_fee'), business_phone: v('business_phone'), alert_hours: v('alert_hours') };
   if (!first) { var picked = function (sel) { return Array.prototype.map.call(document.querySelectorAll(sel + ' input:checked'), function (i) { return i.value; }); }; body.counties = picked('#chips'); body.trades = picked('#trades'); }

@@ -3,3 +3,4 @@ Disallow: /api/
 Disallow: /status
 Disallow: /respond
 Disallow: /pro
+Disallow: /admin

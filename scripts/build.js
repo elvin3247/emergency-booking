@@ -97,13 +97,13 @@ function bookBar(o) {
     return '<label class="chip" for="b-s-' + k + '"><input type="radio" id="b-s-' + k + '" name="s" value="' + k + '"' + (s.live ? (k === first ? ' checked' : '') : ' disabled') + '><span>' + esc(s.name) + (s.live ? '' : '<em>Soon</em>') + '</span></label>';
   }).join('\n          ');
   const groups = LIVE.map(k => '<optgroup label="' + esc(C.services[k].name) + '">' + problemsOf(k).map(p => '<option value="' + p + '"' + (p === o.problem && k === first ? ' selected' : '') + '>' + esc(C.problems[p][0]) + '</option>').join('') + '</optgroup>').join('');
-  return `<form class="book" id="book" action="/request" method="get"${o.county ? ' data-county="' + esc(o.county) + '"' : ''}${o.service ? ' data-service="' + o.service + '"' : ''}${o.problem ? ' data-problem' : ''}>
+  return `<form class="book" id="book" action="/request" method="get" novalidate${o.county ? ' data-county="' + esc(o.county) + '"' : ''}${o.service ? ' data-service="' + o.service + '"' : ''}${o.problem ? ' data-problem' : ''}>
         <fieldset class="svc"><legend>What kind of help do you need?</legend>
           ${chips}
         </fieldset>
         <div class="bar">
           <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p">${groups}</select></div>
-          <div class="z"><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="07059" required></div>
+          <div class="z"><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="5 digits" required></div>
           <input type="hidden" name="county" value="${esc(o.county || '')}">
           <button class="btn" type="submit">Find who can come</button>
         </div>
@@ -280,13 +280,16 @@ write('help.html', shell({
 // ---- Hand-written pages: stamp the shared head, brand, and home page blocks ----
 const PAGES = {
   'index.html': { path: '/', title: 'Emergency Home Repair in New Jersey, 24/7: See Who Can Come Now', desc: 'Home emergency? Pick ' + LIVE_NAMES + ', and licensed New Jersey pros who are free reply with an arrival time and visit fee. You choose. Free for homeowners.' },
-  'contractors.html': { path: '/contractors', title: 'Emergency Repair Leads in New Jersey: Pay Only When Chosen', desc: 'HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. First ' + C.freeLeads + ' chosen leads free, then $' + C.leadFee + ' only when a customer picks you. No monthly fee.' },
+  'contractors.html': { path: '/contractors', title: C.freeLaunch ? 'Free Emergency Repair Leads in New Jersey for Licensed Pros' : 'Emergency Repair Leads in New Jersey: Pay Only When Chosen', desc: 'HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. ' + (C.freeLaunch ? 'Free during our launch: no lead fees, no monthly fee.' : 'First ' + C.freeLeads + ' chosen leads free, then $' + C.leadFee + ' only when a customer picks you. No monthly fee.') },
   'request.html': { path: '/request', title: 'Request Emergency Home Repair in New Jersey', desc: 'Tell us what\'s wrong and we\'ll alert licensed New Jersey pros who can come. Takes about a minute.' },
   'status.html': { title: 'Your request', noindex: true },
   'respond.html': { title: 'Job request', noindex: true },
   'terms.html': { title: 'Terms', noindex: true },
   'privacy.html': { title: 'Privacy policy', noindex: true },
   'pro.html': { title: 'Your contractor settings', noindex: true },
+  'admin.html': { title: 'Admin', noindex: true },
+  'company.html': { title: 'Company profile', noindex: true },
+  'find.html': { title: 'Find your request', noindex: true },
   '404.html': { title: 'Page not found', noindex: true }
 };
 const block = (html, name, inner) => {
@@ -308,7 +311,7 @@ Object.keys(PAGES).forEach(file => {
     html = html.replace(/(<span id="hero-services">)[^<]*/, '$1' + esc(up(LIVE_NAMES)) + ' repair.');
     html = html.replace(/(<p id="faq-services">)[^<]*/, '$1' + esc(up(LIVE_NAMES)) + ' repair today.' + (soon.length ? ' ' + esc(up(list(soon))) + ' ' + (soon.length > 1 ? 'are' : 'is') + ' coming as licensed pros sign up.' : ''));
     const faq = [];
-    html.replace(/<details><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g, (_, q, a) => { faq.push({ '@type': 'Question', name: q.replace(/<[^>]+>/g, '').trim(), acceptedAnswer: { '@type': 'Answer', text: a.replace(/<[^>]+>/g, '').trim() } }); });
+    html.replace(/<details><summary>([\s\S]*?)<\/summary><p[^>]*>([\s\S]*?)<\/p><\/details>/g, (_, q, a) => { faq.push({ '@type': 'Question', name: q.replace(/<[^>]+>/g, '').trim(), acceptedAnswer: { '@type': 'Answer', text: a.replace(/<[^>]+>/g, '').trim() } }); });
     m.ld = [
       Object.assign({ '@context': 'https://schema.org' }, org()),
       { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency home repair', name: 'Emergency ' + LIVE_NAMES + ' repair', provider: org(), areaServed: { '@type': 'State', name: 'New Jersey' }, hoursAvailable: { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], opens: '00:00', closes: '23:59' } },
@@ -322,7 +325,7 @@ Object.keys(PAGES).forEach(file => {
 
 // ---- ZIP lookup for the browser, robots.txt, sitemap.xml ----
 write('assets/nj-zips.js', '// New Jersey ZIP codes: [county index in SITE.counties, place name]. Data from GeoNames (geonames.org), CC BY 4.0.\nwindow.NJ_ZIPS=' + JSON.stringify(ZIPS) + ';\n');
-write('robots.txt', 'User-agent: *\nDisallow: /api/\nDisallow: /status\nDisallow: /respond\nDisallow: /pro\n' + (base ? 'Sitemap: ' + abs('/sitemap.xml') + '\n' : ''));
+write('robots.txt', 'User-agent: *\nDisallow: /api/\nDisallow: /status\nDisallow: /respond\nDisallow: /pro\nDisallow: /admin\n' + (base ? 'Sitemap: ' + abs('/sitemap.xml') + '\n' : ''));
 if (base) write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + sitemap.sort().map(p => '  <url><loc>' + abs(p) + '</loc></url>').join('\n') + '\n</urlset>\n');
 else if (fs.existsSync(path.join(PUB, 'sitemap.xml'))) fs.unlinkSync(path.join(PUB, 'sitemap.xml'));
 

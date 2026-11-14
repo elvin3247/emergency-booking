@@ -1,1 +1,10 @@
-{ "cleanUrls": true, "trailingSlash": false }
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "crons": [
+    {
+      "path": "/api/admin?job=daily",
+      "schedule": "0 11 * * *"
+    }
+  ]
+}

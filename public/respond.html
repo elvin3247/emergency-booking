@@ -27,12 +27,37 @@
 var app = document.getElementById('app'), t = new URLSearchParams(location.search).get('t'), D = null, poll, editingFee = false, fee = null, busy = false;
 var tel = function (p) { return 'tel:' + String(p || '').replace(/[^\d+]/g, ''); };
 
+var MINS = [15, 30, 45, 60, 90];
+var at = function (iso) { return new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }); };
+// Let the customer know where you are. They see it on their page, and get an email for "on my way" and "running late".
+function etaCard() {
+  if (D.job_result) return '';
+  var e = D.eta || {}, h = '<div class="card"><h3>Let ' + esc(D.customer.name) + ' know</h3>';
+  if (e.status === 'arrived') return h + '<p class="sub">You marked that you arrived at ' + at(e.at) + '.</p></div>';
+  if (e.status) h += '<p class="sub">They see: <b>' + (e.status === 'late' ? 'Running late' : 'On the way') + ', about ' + e.min + ' minutes</b> (sent ' + at(e.at) + ').</p>';
+  var kind = e.status ? 'late' : 'on_way';
+  h += '<p class="small" style="font-weight:700">' + (e.status ? 'Running late? New estimate:' : 'On my way. I\'ll be there in about:') + '</p><div class="mins">' +
+    MINS.map(function (m) { return '<button class="btn' + (e.status ? ' ghost' : '') + '" type="button" data-eta="' + kind + '" data-min="' + m + '">' + m + ' min</button>'; }).join('') + '</div>';
+  if (e.status) h += '<div><button class="btn" type="button" data-eta="arrived">I\'m here</button></div>';
+  return h + '<p class="err" id="eerr" role="alert" hidden></p></div>';
+}
+// How the job went. Anything but "done" sends the lead fee to us to review.
+function resultCard(canceled) {
+  if (D.job_result) {
+    var label = { done: 'Job done', canceled: 'Customer canceled', no_contact: 'Couldn\'t reach the customer' }[D.job_result];
+    return '<div class="card"><h3>Closed out: ' + label + '</h3>' + (D.fee_review ? '<p class="sub">We\'re reviewing the lead fee for this job and will let you know.</p>' : '<p class="sub">Thanks.</p>') + '</div>';
+  }
+  return '<div class="card"><h3>' + (canceled ? 'Did you already go out?' : 'After the visit: how did it go?') + '</h3><p class="small sub">If the customer canceled or you couldn\'t reach them, tell us and we\'ll review the lead fee.</p><div class="choices">' +
+    (canceled ? '' : '<button class="btn ghost" type="button" data-result="done">Job done</button>') +
+    '<button class="btn ghost" type="button" data-result="canceled">Customer canceled</button><button class="btn ghost" type="button" data-result="no_contact">I couldn\'t reach the customer</button></div><p class="err" id="rerr" role="alert" hidden></p></div>';
+}
 function render(msg) {
   var r = D.request, s = D.state, c = D.customer, h = '';
   if (fee == null) fee = D.mine.visit_fee;
   h += '<div class="stack"><p class="eyebrow">' + esc(r.county) + ' County · ZIP ' + esc(r.zip) + '</p><h1>' + esc(SITE.problems[r.problem][0]) + '</h1>' +
     '<p class="sub">' + [(SITE.services[r.service] || {}).name, r.timing, r.system].filter(Boolean).map(esc).join(' · ') + '</p></div>';
   if (r.note) h += '<div class="card"><b>Customer\'s note</b><p>' + esc(r.note) + '</p></div>';
+  if (D.photos && D.photos.length) h += '<div class="card"><b>Photos from the customer</b>' + photoGrid(D.photos) + '</div>';
 
   if (s === 'open' || s === 'declined') {
     if (s === 'declined') h += '<div class="notice warn"><b>You passed on this one.</b> No charge and no penalty. Changed your mind? Tap a time below.</div>';
@@ -41,7 +66,7 @@ function render(msg) {
       (editingFee
         ? '<div class="feeedit"><label for="fee">Visit fee for this job ($)</label><input type="number" id="fee" min="0" max="1000" step="1" inputmode="numeric" value="' + esc(fee) + '"><p class="small sub">Tap a time above to send it with this fee.</p></div>'
         : '<p class="feeline">Your visit fee: <b>$' + esc(fee) + '</b> <button class="linkbtn" type="button" data-act="fee">Change for this job</button></p>') +
-      '<p class="small sub">' + (D.free_leads_left > 0 ? 'Free lead: you have ' + D.free_leads_left + ' left, so this costs nothing if you\'re chosen.' : 'You pay $' + SITE.leadFee + ' only if the customer chooses you.') + ' The customer\'s name and address are shared once they pick you.</p>' +
+      '<p class="small sub">' + (SITE.freeLaunch ? 'No lead fee: we\'re free for contractors during our launch.' : D.free_leads_left > 0 ? 'Free lead: you have ' + D.free_leads_left + ' left, so this costs nothing if you\'re chosen.' : 'You pay $' + SITE.leadFee + ' only if the customer chooses you.') + ' The customer\'s name and address are shared once they pick you.</p>' +
       '<p class="err" id="err" role="alert" hidden></p>' +
       (s === 'open' ? '<div><button class="btn ghost" type="button" data-act="decline">Can\'t take this one</button></div>' : '');
   } else if (s === 'accepted') {
@@ -49,9 +74,19 @@ function render(msg) {
       '<div><button class="btn ghost sm" type="button" data-act="decline">I can\'t make it after all</button></div>';
   } else if (s === 'chosen') {
     h += '<div class="notice good"><b>The customer chose you.</b> Call them now to confirm: ' + esc(D.mine.arrival) + ', $' + esc(D.mine.visit_fee) + ' visit fee.</div>' +
+      (D.confirmed || D.job_result ? '' : '<div class="card" style="border-color:var(--accent)"><h3>Step 1: call, then confirm</h3><p class="small sub">Tap this once you\'ve talked to them. If you don\'t confirm or send an update within ' + SITE.confirmMin + ' minutes, the customer can switch to another pro.</p><div><button class="btn" type="button" data-confirmjob>I\'ve talked to the customer</button></div><p class="err" id="cferr" role="alert" hidden></p></div>') +
       '<div class="card"><h2>' + esc(c.name) + '</h2><dl class="kv"><dt>Phone</dt><dd><a href="' + tel(c.phone) + '">' + esc(c.phone) + '</a></dd><dt>Address</dt><dd>' + esc(c.address) + ', ' + esc(r.zip) + '</dd><dt>Email</dt><dd>' + esc(c.email) + '</dd></dl>' +
       '<div><a class="btn" href="' + tel(c.phone) + '">Call ' + esc(c.name) + '</a></div></div>' +
-      '<p class="small sub">' + (D.lead_fee ? 'Lead fee for this job: $' + esc(D.lead_fee) + '.' : 'This lead was free.') + '</p>';
+      etaCard() + resultCard() +
+      '<p class="small sub">' + (D.lead_fee ? 'Lead fee for this job: $' + esc(D.lead_fee) + '.' : SITE.freeLaunch ? 'No lead fee during our launch.' : 'This lead was free.') + '</p>';
+  } else if (s === 'chosen_canceled') {
+    h += '<div class="notice warn"><b>The customer canceled this visit.</b> Please don\'t head over.</div>' + resultCard(true);
+  } else if (s === 'no_show') {
+    h += '<div class="notice crit"><b>The customer switched to another pro</b> because they couldn\'t reach you or you didn\'t arrive. Please don\'t head over. If that\'s not right, reply to the email we sent and tell us what happened.</div>';
+  } else if (s === 'standby') {
+    h += '<div class="notice"><b>The customer chose another pro, so you\'re on standby.</b> If their first choice falls through in the next ' + SITE.standbyMin + ' minutes, they may pick you and we\'ll email you right away. Nothing to do now. No charge.</div>';
+  } else if (s === 'canceled') {
+    h += '<div class="notice warn"><b>The customer canceled this request.</b> No charge. Thanks for answering.</div>';
   } else if (s === 'filled') {
     h += '<div class="notice warn"><b>The customer went with another contractor.</b> No charge. Thanks for answering.</div>';
   } else if (s === 'full') {
@@ -59,16 +94,30 @@ function render(msg) {
   } else {
     h += '<div class="notice warn"><b>This request has closed.</b> No charge.</div>';
   }
-  if (D.manage) h += '<p class="small"><a href="/pro?t=' + encodeURIComponent(D.manage) + '">Busy? Pause alerts or change your settings</a></p>';
+  if (D.manage) h += '<p class="small"><a href="/pro?t=' + encodeURIComponent(D.manage) + '">All your jobs, settings, and pausing alerts</a></p>';
   app.innerHTML = h;
   if (msg) { var e = document.getElementById('err'); if (e) { e.textContent = msg; e.hidden = false; } }
 }
 async function load() {
-  try { D = await api('/api/alerts?t=' + encodeURIComponent(t || '')); if (!busy) render(); if (['chosen', 'filled', 'closed'].includes(D.state)) clearInterval(poll); }
+  try { D = await api('/api/alerts?t=' + encodeURIComponent(t || '')); if (!busy) render(); if (['chosen', 'chosen_canceled', 'filled', 'closed', 'no_show', 'canceled'].includes(D.state)) clearInterval(poll); }
   catch (e) { if (!D) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div>'; clearInterval(poll); } }
 }
 app.addEventListener('input', function (e) { if (e.target.id === 'fee') fee = e.target.value; });
 app.addEventListener('click', async function (e) {
+  var cf = e.target.closest('[data-confirmjob]');
+  if (cf && !busy) {
+    busy = true; cf.disabled = true; cf.textContent = 'Confirming...';
+    try { D = await api('/api/alerts', { t: t, action: 'confirm' }); busy = false; render(); track('pro_confirmed'); }
+    catch (x) { busy = false; cf.disabled = false; cf.textContent = 'Try again'; var ce = document.getElementById('cferr'); ce.textContent = x.message; ce.hidden = false; }
+    return;
+  }
+  var et = e.target.closest('[data-eta]'), rs = e.target.closest('[data-result]');
+  if ((et || rs) && !busy) {
+    busy = true; (et || rs).disabled = true;
+    try { D = await api('/api/alerts', et ? { t: t, action: 'eta', status: et.dataset.eta, minutes: Number(et.dataset.min) } : { t: t, action: 'result', result: rs.dataset.result }); busy = false; render(); track(et ? 'pro_eta_' + et.dataset.eta : 'pro_result_' + rs.dataset.result); }
+    catch (x) { busy = false; render(); var er = document.getElementById(et ? 'eerr' : 'rerr'); if (er) { er.textContent = x.message; er.hidden = false; } }
+    return;
+  }
   var a = e.target.closest('[data-arrival]'), act = e.target.closest('[data-act]');
   if (act && act.dataset.act === 'fee') { editingFee = true; render(); var f = document.getElementById('fee'); if (f) f.focus(); return; }
   if (!a && !(act && act.dataset.act === 'decline')) return;

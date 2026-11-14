@@ -6,11 +6,34 @@
     brand: brand,
     siteUrl: '',        // your live address, e.g. 'https://example.com'. Needed for the sitemap and share previews. Run `npm run build` after changing.
     analytics: 'vercel', // page-view counts via Vercel Web Analytics (turn it on in the Vercel dashboard). Set to '' to remove.
-    leadFee: 50,        // dollars per chosen lead
+    // Free launch: no lead fees for anyone while we build up the network. Set to false to start charging
+    // leadFee per chosen lead (after each pro's freeLeads). Give pros 30 days' notice by email first, as the terms promise.
+    freeLaunch: true,
+    leadFee: 50,        // dollars per chosen lead, once freeLaunch is off
     freeLeads: 3,       // first chosen leads are free
     maxOffers: 3,       // contractors a customer can choose between
     windowMin: 15,      // minutes before we say no one has confirmed
     openHours: 12,      // hours a request keeps accepting offers
+    widenMin: 10,       // no yes after this many minutes: remind the pros we alerted and add pros from neighboring counties
+    confirmMin: 10,     // the chosen pro should confirm within this many minutes, or the homeowner is offered another pro
+    standbyMin: 30,     // after a match, the other pros who said yes stay on standby this long
+    keepPhotosDays: 90, // photos are deleted after this many days
+    // Counties that share a border, for widening a search.
+    neighbors: {
+      Atlantic: ['Burlington', 'Camden', 'Gloucester', 'Cumberland', 'Cape May', 'Ocean'], Bergen: ['Passaic', 'Hudson', 'Essex'],
+      Burlington: ['Mercer', 'Monmouth', 'Ocean', 'Atlantic', 'Camden'], Camden: ['Burlington', 'Gloucester', 'Atlantic'],
+      'Cape May': ['Atlantic', 'Cumberland'], Cumberland: ['Salem', 'Gloucester', 'Atlantic', 'Cape May'],
+      Essex: ['Passaic', 'Bergen', 'Hudson', 'Union', 'Morris'], Gloucester: ['Camden', 'Salem', 'Cumberland', 'Atlantic'],
+      Hudson: ['Bergen', 'Essex', 'Union'], Hunterdon: ['Warren', 'Morris', 'Somerset', 'Mercer'],
+      Mercer: ['Hunterdon', 'Somerset', 'Middlesex', 'Monmouth', 'Burlington'], Middlesex: ['Somerset', 'Union', 'Monmouth', 'Mercer'],
+      Monmouth: ['Middlesex', 'Mercer', 'Burlington', 'Ocean'], Morris: ['Sussex', 'Passaic', 'Essex', 'Union', 'Somerset', 'Hunterdon', 'Warren'],
+      Ocean: ['Monmouth', 'Burlington', 'Atlantic'], Passaic: ['Sussex', 'Morris', 'Essex', 'Bergen'], Salem: ['Gloucester', 'Cumberland'],
+      Somerset: ['Hunterdon', 'Morris', 'Union', 'Middlesex', 'Mercer'], Sussex: ['Warren', 'Morris', 'Passaic'],
+      Union: ['Essex', 'Morris', 'Somerset', 'Middlesex', 'Hudson'], Warren: ['Sussex', 'Morris', 'Hunterdon']
+    },
+    maxPhotos: 3,       // photos a homeowner can add to a request
+    minReviews: 3,      // a pro's star rating shows to homeowners once they have this many reviews
+    limits: { perContactHour: 3, perDeviceHour: 6 }, // most requests one email, phone, or internet connection can send in an hour
     counties: ['Atlantic', 'Bergen', 'Burlington', 'Camden', 'Cape May', 'Cumberland', 'Essex', 'Gloucester', 'Hudson', 'Hunterdon', 'Mercer', 'Middlesex', 'Monmouth', 'Morris', 'Ocean', 'Passaic', 'Salem', 'Somerset', 'Sussex', 'Union', 'Warren'],
     // The kinds of company we sign up. Each has its own New Jersey license, which you check before approving.
     trades: {

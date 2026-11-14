@@ -64,19 +64,32 @@ function showForm() {
     '<form class="card" id="f" novalidate>' +
     '<div class="row"><div><label for="zip">ZIP code</label><input type="text" id="zip" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div>' +
     '<div><label for="county">County</label><select id="county"><option value="">Choose your county</option>' + opts(SITE.counties) + '</select></div></div>' +
+    '<div class="row"><div><label for="phone">Phone number</label><input type="tel" id="phone" autocomplete="tel"></div>' +
+    '<div><label for="email">Email</label><input type="email" id="email" autocomplete="email"></div></div>' +
     '<div class="row"><div><label for="timing">How soon?</label><select id="timing">' + opts(SITE.timings) + '</select></div>' +
     (hvac ? '<div><label for="system">What kind of system?</label><select id="system">' + opts(SITE.systems) + '</select></div>' : '<div hidden><input type="hidden" id="system" value=""></div>') + '</div>' +
-    '<div><label for="note">Anything else? (optional)</label><textarea id="note" maxlength="500" placeholder="A sentence about what you see or hear helps the pro come prepared"></textarea></div>' +
+    // Optional: book the first pro who can come within the hour, no comparing.
+    '<div class="notice" style="background:var(--accent-soft)"><label class="check" for="auto" style="color:var(--ink)"><input type="checkbox" id="auto"><span><b>Book the first licensed pro who can come within 1 hour.</b> Skip comparing. We\'ll connect you the moment one says yes.</span></label>' +
+    '<div id="autofee" hidden style="margin-top:10px"><label for="maxfee">Highest visit fee you\'ll accept</label><select id="maxfee"><option value="">Any fee</option><option value="100">Up to $100</option><option value="150" selected>Up to $150</option><option value="200">Up to $200</option></select></div></div>' +
+    '<details class="more"' + (ME.get().name ? ' open' : '') + '><summary>Name, address, notes, and photos <span class="sub small">(optional now)</span></summary><div class="stack" style="margin-top:12px">' +
+    (ME.get().name ? '<p class="small sub">Filled in from last time on this device. <button class="quiet" type="button" data-forget>Not you? Clear</button></p>' : '<p class="small sub">Skip these to alert pros faster. You\'ll add your name and address on the next screen while they answer.</p>') +
     '<div class="row"><div><label for="name">Your name</label><input type="text" id="name" autocomplete="name"></div>' +
-    '<div><label for="phone">Phone number</label><input type="tel" id="phone" autocomplete="tel"></div></div>' +
-    '<div><label for="email">Email</label><input type="email" id="email" autocomplete="email"><p class="small sub" style="margin-top:4px">We email you when a pro says yes.</p></div>' +
-    '<div><label for="address">Street address</label><input type="text" id="address" autocomplete="street-address"><p class="small sub" style="margin-top:4px">Your name, phone, email, and address go only to the pro you choose.</p></div>' +
+    '<div><label for="address">Street address</label><input type="text" id="address" autocomplete="street-address"></div></div>' +
+    '<div><label for="note">Anything else?</label><textarea id="note" maxlength="500" placeholder="A sentence about what you see or hear helps the pro come prepared"></textarea></div>' +
+    '<div><label for="photos">Photos</label><input type="file" id="photos" accept="image/*" multiple style="font:500 .95rem var(--font);max-width:100%"><p class="small sub" style="margin-top:4px">Up to ' + SITE.maxPhotos + '. A photo of the leak, the error code, or the unit\'s label helps the pro bring the right parts.</p></div>' +
+    '</div></details>' +
     '<div class="hp" aria-hidden="true"><label for="website">Leave this empty</label><input type="text" id="website" tabindex="-1" autocomplete="off"></div>' +
     '<label class="check" for="consent"><input type="checkbox" id="consent"><span>' + esc(SITE.consent.homeowner) + ' See our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</span></label>' +
+    '<p class="small sub">Your contact details go only to the pro you choose.</p>' +
     '<p class="err" id="err" role="alert" hidden></p>' +
-    '<div class="btns"><button class="btn" type="submit" id="go">Find who can come</button><button class="btn ghost" type="button" data-back="problems">Back</button></div></form>';
+    '<div class="btns"><button class="btn" type="submit" id="go">Alert pros now</button><button class="btn ghost" type="button" data-back="problems">Back</button></div></form>';
+  track('form_opened');
+  // Fill in a returning homeowner's details, then anything typed earlier in this tab, then what the page they came from chose.
+  var me = ME.get(); ['name', 'phone', 'email', 'address', 'zip'].forEach(function (k) { if (me[k]) document.getElementById(k).value = me[k]; });
+  if (me.zip) zipToCounty();
   // Bring back anything typed earlier in this tab, then anything chosen on the page they came from.
   restoreDraft();
+  document.getElementById('auto').addEventListener('change', function (e) { document.getElementById('autofee').hidden = !e.target.checked; });
   if (SITE.counties.indexOf(Q.get('county')) > -1) document.getElementById('county').value = Q.get('county');
   if (SITE.timings.indexOf(Q.get('timing')) > -1) document.getElementById('timing').value = Q.get('timing');
   if (/^\d{5}$/.test(Q.get('zip') || '')) { document.getElementById('zip').value = Q.get('zip'); zipToCounty(); }
@@ -95,13 +108,24 @@ app.addEventListener('click', function (e) {
 app.addEventListener('submit', async function (e) {
   e.preventDefault();
   var v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
-  err.hidden = true; go.disabled = true; go.textContent = 'Sending...';
+  err.hidden = true; go.disabled = true; go.textContent = 'Alerting pros...';
+  var auto = document.getElementById('auto').checked;
   try {
-    var out = await api('/api/requests', { service: service, problem: problem, zip: v('zip'), county: v('county'), timing: v('timing'), system: v('system'), note: v('note'), name: v('name'), phone: v('phone'), email: v('email'), address: v('address'), website: v('website'), source: siteSource(), consent: document.getElementById('consent').checked });
+    var out = await api('/api/requests', { service: service, problem: problem, zip: v('zip'), county: v('county'), timing: v('timing'), system: v('system'), note: v('note'), name: v('name'), phone: v('phone'), email: v('email'), address: v('address'), auto_pick: auto, auto_max_fee: auto ? v('maxfee') : '', website: v('website'), source: siteSource(), consent: document.getElementById('consent').checked });
+    ME.save({ name: v('name'), phone: v('phone'), email: v('email'), address: v('address'), zip: v('zip') });
     try { sessionStorage.removeItem('draft'); } catch (x) {}
+    // Photos go up after the request exists. A failed photo never blocks the request.
+    var files = document.getElementById('photos').files;
+    if (files && files.length) { go.textContent = 'Adding photos...'; await uploadPhotos(out.token, files, SITE.maxPhotos); }
     rememberRequest(out.token); track('request_submitted');
     location.href = '/status?t=' + encodeURIComponent(out.token);
-  } catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Find who can come'; }
+  } catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Alert pros now'; }
+});
+app.addEventListener('click', function (e) {
+  if (!e.target.closest('[data-forget]')) return;
+  ME.clear(); try { sessionStorage.removeItem('draft'); } catch (x) {}
+  ['name', 'phone', 'email', 'address'].forEach(function (k) { document.getElementById(k).value = ''; });
+  e.target.closest('p').textContent = 'Cleared from this device.';
 });
 problem ? showForm() : service ? showProblems() : showServices();
 </script>

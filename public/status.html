@@ -24,12 +24,113 @@
 <script src="/assets/site.js"></script>
 <script>
 var app = document.getElementById('app'), token = new URLSearchParams(location.search).get('t');
-var D = null, skew = 0, confirming = null, busy = false, poll;
+var D = null, skew = 0, confirming = null, busy = false, poll, panel = null; // panel: 'cancel' or 'noshow' while that question is open
 var steps = function (n) { return '<ol class="steps">' + ['Problem', 'Details', 'Who can come', 'Connected'].map(function (s, i) { return '<li class="' + (i <= n ? 'on' : '') + '">' + (i + 1) + '. ' + s + '</li>'; }).join('') + '</ol>'; };
 var left = function () { return (D.window_ends - (Date.now() + skew)) / 1000; };
 var svc = function () { return SITE.services[D.request.service] || { name: '', trade: 'hvac' }; };
 var T = function () { return SITE.trades[svc().trade]; };
 var summary = function () { var r = D.request; return (svc().name ? esc(svc().name) + ': ' : '') + SITE.problems[r.problem][0] + ' · ' + esc(r.zip) + ' · ' + esc(r.timing); };
+var STAR = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3 6.5 7 .8-5.2 4.800 1.500 7L12 17.600 5.700 21.100l1.500-7L2 9.300l7-.8z"/></svg>';
+var rated = function (o) { return o.rating ? ' · <span class="rated">' + STAR + ' ' + o.rating.avg.toFixed(1) + '</span> from ' + o.rating.count + ' reviews' : ''; };
+var review = function () {
+  if (D.reviewed) return '<div class="notice good"><b>Thanks for the review.</b> It helps your neighbors pick.</div>';
+  return '<form class="card" id="review"><h3>After the visit: how did it go?</h3><p class="small sub">Ten seconds. Your rating helps the next homeowner choose.</p>' +
+    '<fieldset class="stars"><legend class="hp">Rating, 1 to 5</legend>' + [1, 2, 3, 4, 5].map(function (n) { return '<label for="st' + n + '"><input type="radio" name="rating" id="st' + n + '" value="' + n + '"><span>' + n + '</span></label>'; }).join('') + '</fieldset><p class="small sub">1 is poor, 5 is great.</p>' +
+    '<fieldset class="stars" id="ontime"><legend style="font-weight:700;font-size:.92rem;margin-bottom:6px">Did they arrive in the time they promised?</legend><label for="ot-y"><input type="radio" name="ontime" id="ot-y" value="yes"><span style="width:auto;padding:0 18px">Yes</span></label><label for="ot-n"><input type="radio" name="ontime" id="ot-n" value="no"><span style="width:auto;padding:0 18px">No, late</span></label></fieldset>' +
+    '<div><label for="rtext">Anything to add? (optional)</label><textarea id="rtext" maxlength="600"></textarea></div>' +
+    '<p class="err" id="rerr" role="alert" hidden></p><div><button class="btn" type="submit">Send review</button></div></form>';
+};
+var when = function (iso) { return new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }); };
+var profile = function (o) { return '<a href="/company?id=' + encodeURIComponent(o.pro_id) + '" target="_blank" rel="noopener">See profile</a>'; };
+// Photos: what's attached, and a way to add more while the request is live.
+var photos = function () {
+  var can = (D.state === 'open' || (D.state === 'matched' && !D.reviewed)) && D.photos.length < D.max_photos;
+  if (!D.photos.length && !can) return '';
+  return '<div class="card"><h3>Photos</h3>' + (D.photos.length ? photoGrid(D.photos) : '<p class="small sub">A photo of the problem helps the pro come prepared.</p>') +
+    (can ? '<div class="photo-add"><label class="btn ghost sm" for="addph">' + (D.photos.length ? 'Add another photo' : 'Add a photo') + '</label><input class="hp" type="file" id="addph" accept="image/*" multiple><span class="small sub" id="phmsg"></span></div>' : '') + '</div>';
+};
+// Cancel and no-show: always a second tap to confirm, so nobody does it by accident.
+var cancelBox = function () {
+  if (D.state === 'matched' && (D.reviewed || (D.chosen.eta && D.chosen.eta.status === 'arrived'))) return '';
+  if (panel !== 'cancel') return '<p class="small"><button class="quiet" type="button" data-panel="cancel">' + (D.state === 'matched' ? 'Cancel the visit' : 'Don\'t need help anymore? Cancel this request') + '</button></p>';
+  return '<div class="card"><h3>' + (D.state === 'matched' ? 'Cancel the visit?' : 'Cancel this request?') + '</h3><p class="small sub">' + (D.state === 'matched' ? 'We\'ll tell ' + esc(D.chosen.company) + ' right away so they don\'t head over.' : 'Pros who said yes will be told. You can always start a new request.') + '</p>' +
+    '<div><label for="why">Why? (helps us improve)</label><select id="why">' + ['I fixed it myself', 'I found someone else', 'I no longer need it', 'Other'].map(function (r) { return '<option>' + r + '</option>'; }).join('') + '</select></div>' +
+    '<p class="err" id="cerr" role="alert" hidden></p><div class="btns"><button class="btn dark" type="button" data-do="cancel">Yes, cancel it</button><button class="btn ghost" type="button" data-panel="">Keep it</button></div></div>';
+};
+// The chosen pro didn't confirm or didn't come: switch to a pro on standby in one tap, or send it out again.
+var standbyCards = function () {
+  return (D.standby || []).map(function (o) {
+    return '<div class="offer" style="padding:14px"><span><b>' + esc(o.company) + '</b><br><span class="sub small">' + esc(o.arrival) + ' · $' + esc(o.visit_fee) + ' visit' + rated(o) + ' · ' + profile(o) + '</span></span><button class="btn sm" type="button" data-switch="' + esc(o.id) + '">Switch to them</button></div>';
+  }).join('');
+};
+var noShowBox = function () {
+  var c = D.chosen, n = (D.standby || []).length;
+  var mins = n ? Math.max(1, Math.round((D.standby_ends - (Date.now() + skew)) / 60000)) : 0;
+  if (D.unconfirmed || panel === 'noshow') {
+    return '<div class="card" style="border-color:var(--warn)"><h3>' + (D.unconfirmed ? 'Haven\'t heard from ' + esc(c.company) + '?' : 'Need someone else?') + '</h3>' +
+      '<p class="small sub">Try calling them first at <a href="tel:' + esc(c.phone.replace(/\D/g, '')) + '">' + esc(c.phone) + '</a>. ' + (n ? 'If you can\'t reach them, ' + (n === 1 ? 'this pro is' : 'these pros are') + ' still available for about ' + mins + ' more minute' + (mins === 1 ? '' : 's') + ':' : 'If you can\'t reach them, we\'ll send your request out to other pros right away.') + '</p>' +
+      standbyCards() + '<p class="err" id="nerr" role="alert" hidden></p>' +
+      '<div class="btns"><button class="btn ' + (n ? 'ghost' : '') + '" type="button" data-do="noshow">' + (n ? 'Send it to everyone again instead' : 'Find someone else') + '</button>' + (panel === 'noshow' ? '<button class="btn ghost" type="button" data-panel="">Never mind</button>' : '') + '</div></div>';
+  }
+  return '<div class="card"><h3>They didn\'t show up?</h3><p class="small sub">Call them first at ' + esc(c.phone) + '. If they\'re not coming, you can switch to another pro.</p><div><button class="btn ghost" type="button" data-panel="noshow">They\'re not coming. Find someone else.</button></div></div>';
+};
+// Fix a typo in the phone or email they gave.
+var contactBox = function () {
+  if (D.state === 'closed' || D.state === 'canceled') return '';
+  if (panel !== 'contact') return '<p class="small"><button class="quiet" type="button" data-panel="contact">Wrong phone number or email? Fix it</button></p>';
+  return '<form class="card" id="contact"><h3>Fix your contact details</h3>' + (D.state === 'matched' ? '<p class="small sub">We\'ll send the corrected details to ' + esc(D.chosen.company) + '.</p>' : '') +
+    '<div class="row"><div><label for="fphone">Phone</label><input type="tel" id="fphone" autocomplete="tel" value="' + esc(D.request.phone || '') + '"></div><div><label for="femail">Email</label><input type="email" id="femail" autocomplete="email" value="' + esc(D.request.email || '') + '"></div></div>' +
+    '<p class="err" id="ferr" role="alert" hidden></p><div class="btns"><button class="btn" type="submit" id="fgo">Save</button><button class="btn ghost" type="button" data-panel="">Cancel</button></div></form>';
+};
+var etaBox = function () {
+  var e = D.chosen.eta;
+  if (!e || !e.status) return D.confirmed
+    ? '<div class="eta here"><div><b>' + esc(D.chosen.company) + ' confirmed with you</b><span class="small">They\'ll update this when they\'re on the way. Promised: ' + esc(D.chosen.arrival) + '.</span></div></div>'
+    : '<div class="eta"><div><b>Waiting for ' + esc(D.chosen.company) + ' to call you</b><span class="small">They should be in touch within ' + SITE.confirmMin + ' minutes. Promised arrival: ' + esc(D.chosen.arrival) + '.</span></div></div>';
+  if (e.status === 'arrived') return '<div class="eta here"><div><b>' + esc(D.chosen.company) + ' has arrived</b><span class="small">Marked at ' + when(e.at) + '.</span></div></div>';
+  var due = new Date(new Date(e.at).getTime() + e.min * 60000);
+  return '<div class="eta' + (e.status === 'late' ? ' late' : '') + '"><span class="pulse"></span><div><b>' + (e.status === 'late' ? 'Running late. ' : 'On the way. ') + 'Expected around ' + when(due.toISOString()) + '</b><span class="small">Update sent at ' + when(e.at) + ': about ' + e.min + ' minutes away.</span></div></div>';
+};
+// Name and address: asked for here, while pros answer, if they skipped them on the form.
+var typed = {}; // what they've typed so far, so a page refresh never wipes it
+var detailFields = function (pre) {
+  var me = ME.get(), tn = typed[pre + 'name'], ta = typed[pre + 'addr'];
+  return '<div class="row"><div><label for="' + pre + 'name">Your name</label><input type="text" id="' + pre + 'name" autocomplete="name" value="' + esc(tn != null ? tn : D.name || me.name || '') + '"></div>' +
+    '<div><label for="' + pre + 'addr">Street address</label><input type="text" id="' + pre + 'addr" autocomplete="street-address" value="' + esc(ta != null ? ta : me.address || '') + '"></div></div>';
+};
+var autoLine = function () { return D.auto_pick ? 'We\'ll book the first pro who can come within 1 hour' + (D.auto_max_fee ? ' with a visit fee of $' + D.auto_max_fee + ' or less' : '') : ''; };
+var detailsCard = function () {
+  if (!D.needs_details || D.state !== 'open') return '';
+  return '<form class="card" id="details" style="border-color:var(--accent)"><h3>While you wait: where should the pro go?</h3><p class="small sub">' + (D.auto_pick ? autoLine() + ' as soon as you add these.' : 'Add these now so you can choose the moment someone says yes.') + ' Only the pro you choose sees them.</p>' +
+    detailFields('d') + '<p class="err" id="derr" role="alert" hidden></p><div><button class="btn" type="submit" id="dgo">Save</button></div></form>';
+};
+var autoCard = function () { return D.auto_pick && !D.needs_details && D.state === 'open' ? '<div class="notice" style="background:var(--accent-soft);color:var(--accent-deep)"><b>Auto-booking is on.</b> ' + autoLine() + '. You\'ll see it here and get an email.</div>' : ''; };
+var typicalLine = function () {
+  if (!D.typical) return '';
+  var who = cap(T().pros);
+  return '<p class="small"><b>' + (D.typical.where === 'county' ? who + ' near you' : 'Across New Jersey, ' + T().pros) + ' usually answer in about ' + D.typical.min + ' minute' + (D.typical.min === 1 ? '' : 's') + '.</b></p>';
+};
+var cap = function (x) { return x.charAt(0).toUpperCase() + x.slice(1); };
+// Sound and a phone notification when a pro says yes, for people who put the phone down. Browsers only allow this after a tap.
+var alertOn = false, actx = null, seen = null;
+var alertCard = function () {
+  if (D.state !== 'open') return '';
+  return '<div class="alertme"><span class="small">' + (alertOn ? '<b>Alerts on.</b> Keep this page open. We\'ll chime when a pro says yes.' : 'Want a chime when a pro says yes?') + '</span>' + (alertOn ? '' : '<button class="btn sm" type="button" data-alertme>Turn on alerts</button>') + '</div>';
+};
+function chime() {
+  try {
+    if (!actx) return;
+    [0, 0.18].forEach(function (t, i) { var o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = i ? 1046 : 784; o.connect(g); g.connect(actx.destination); g.gain.setValueAtTime(0.0001, actx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.3, actx.currentTime + t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + t + 0.35); o.start(actx.currentTime + t); o.stop(actx.currentTime + t + 0.4); });
+  } catch (e) {}
+  try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+}
+function announce(msg) {
+  document.title = msg + ' | ' + SITE.brand;
+  if (alertOn) chime();
+  try { if (alertOn && document.hidden && window.Notification && Notification.permission === 'granted') new Notification(msg, { body: 'Open your request to see who can come.', tag: 'offer' }); } catch (e) {}
+}
+document.addEventListener('visibilitychange', function () { if (!document.hidden && D && D.state !== 'open') document.title = 'Your request | ' + SITE.brand; });
+var findLink = '<p class="small sub">Lost this page later? <a href="/find">Get your link by email</a>.</p>';
 var backup = function () {
   if (!D.backup || !D.backup.length) return '';
   return '<div class="card"><h3>Contractors you can call directly</h3><p class="small sub">Licensed and signed up in ' + esc(D.request.county) + ' County, but not confirmed available right now.</p>' +
@@ -40,56 +141,120 @@ function render() {
   var h = '', n = D.offers.length;
   if (D.state === 'matched') {
     var c = D.chosen;
-    h = '<div><h1>You\'re connected</h1><p class="sub">' + esc(c.company) + ' has your details and will contact you to confirm.</p></div>' + steps(3) +
+    h = '<div><h1>You\'re connected</h1><p class="sub">' + esc(c.company) + ' has your details and will contact you to confirm.</p></div>' + steps(3) + etaBox() + (D.unconfirmed && !(c.eta && c.eta.status === 'arrived') ? noShowBox() : '') +
       '<div class="card"><div class="split"><h2>' + esc(c.company) + '</h2><span class="pill ok">Confirmed</span></div>' +
-      '<dl class="kv"><dt>Arrives</dt><dd>' + esc(c.arrival) + '</dd><dt>Visit fee</dt><dd>$' + esc(c.visit_fee) + ', paid to the contractor</dd><dt>Their phone</dt><dd>' + esc(c.phone) + '</dd><dt>License</dt><dd>' + esc(c.license) + '</dd><dt>Your request</dt><dd>' + SITE.problems[D.request.problem][0] + ' at ' + esc(D.request.address) + ', ' + esc(D.request.zip) + '</dd></dl></div>' +
-      '<div class="card"><h3>What happens next</h3><ul class="plain"><li>The contractor calls or texts you to confirm the time.</li><li>You pay them for the visit and any repair you approve.</li><li>If you don\'t hear from them, call the number above.</li></ul></div>';
+      '<dl class="kv"><dt>Arrives</dt><dd>' + esc(c.arrival) + '</dd><dt>Visit fee</dt><dd>$' + esc(c.visit_fee) + ', paid to the contractor</dd><dt>Their phone</dt><dd>' + esc(c.phone) + '</dd><dt>License</dt><dd>' + esc(c.license) + ' · ' + profile(c) + '</dd><dt>Your request</dt><dd>' + SITE.problems[D.request.problem][0] + ' at ' + esc(D.request.address) + ', ' + esc(D.request.zip) + '</dd></dl></div>' +
+      '<div class="card"><h3>What happens next</h3><ul class="plain"><li>The contractor calls or texts you to confirm the time.</li><li>You pay them for the visit and any repair you approve.</li><li>If you don\'t hear from them, call the number above.</li></ul></div>' + (c.eta && c.eta.status === 'arrived' || D.unconfirmed ? '' : noShowBox()) + review() + photos() + contactBox() + cancelBox() + findLink;
+  } else if (D.state === 'canceled') {
+    h = '<div><h1>Request canceled</h1><p class="sub">Nobody else will be alerted, and any pro who said yes has been told. Glad it\'s sorted.</p></div><div><a class="btn" href="/request">Start a new request</a></div>';
   } else if (D.state === 'closed') {
     h = '<div><h1>This request has closed</h1><p class="sub">Requests stay open for ' + SITE.openHours + ' hours. If you still need help, start a new one.</p></div>' + backup() + '<div><a class="btn" href="/request">Start a new request</a></div>';
   } else if (n) {
-    h = '<div><h1>Choose who comes</h1><p class="sub">' + (n === 1 ? 'This contractor' : 'These contractors') + ' said yes. Pick one any time, or wait to see if more respond.</p></div>' + steps(2) +
-      '<div class="card"><div class="split"><div><span class="pill ok"><span class="pulse"></span>' + n + ' of up to ' + SITE.maxOffers + ' said yes</span><div class="small sub" style="margin-top:6px">' + summary() + '</div></div></div></div>' +
+    h = (D.reopened ? '<div class="notice warn">We sent your request out again because your first pro didn\'t make it. These are new answers.</div>' : '') + '<div><h1>Choose who comes</h1><p class="sub">' + (n === 1 ? 'This contractor' : 'These contractors') + ' said yes. Pick one any time, or wait to see if more respond.</p></div>' + steps(2) +
+      autoCard() + detailsCard() + alertCard() + '<div class="card"><div class="split"><div><span class="pill ok"><span class="pulse"></span>' + n + ' of up to ' + SITE.maxOffers + ' said yes</span><div class="small sub" style="margin-top:6px">' + summary() + '</div></div></div></div>' +
       D.offers.map(function (o) {
         var pick = confirming === o.id
-          ? '<p class="small">This shares your name, phone, email, and address with ' + esc(o.company) + '.</p><div class="btns"><button class="btn" type="button" data-confirm="' + o.id + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Connecting...' : 'Yes, connect us') + '</button><button class="btn ghost" type="button" data-cancel>Not yet</button></div>'
+          ? (D.needs_details ? '<p class="small"><b>Where should ' + esc(o.company) + ' go?</b></p>' + detailFields('c') : '') + '<p class="small">This shares your name, phone, email, and address with ' + esc(o.company) + '.</p><div class="btns"><button class="btn" type="button" data-confirm="' + o.id + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Connecting...' : 'Yes, connect us') + '</button><button class="btn ghost" type="button" data-cancel>Not yet</button></div>'
           : '<div><button class="btn" type="button" data-choose="' + o.id + '">Choose ' + esc(o.company) + '</button></div>';
-        return '<div class="card"><div><h3>' + esc(o.company) + '</h3><div class="small sub">' + esc(T().license) + ' ' + esc(o.license) + '</div></div>' +
+        return '<div class="card"><div><h3>' + esc(o.company) + '</h3><div class="small sub">' + esc(T().license) + ' ' + esc(o.license) + rated(o) + ' · ' + profile(o) + '</div></div>' +
           '<dl class="facts"><div><dt>Arrives</dt><dd>' + esc(o.arrival) + '</dd></div><div><dt>Visit fee</dt><dd>$' + esc(o.visit_fee) + '</dd></div><div><dt>Said yes in</dt><dd>' + (o.secs < 3600 ? mmss(o.secs) : Math.round(o.secs / 3600) + ' hr') + '</dd></div></dl>' + pick + '</div>';
       }).join('') +
-      '<p class="err" id="err" role="alert" hidden></p><p class="small sub">The visit fee covers the trip and diagnosis and is paid to the contractor. Repairs are quoted on site.</p>';
+      '<p class="err" id="err" role="alert" hidden></p><p class="small sub">The visit fee covers the trip and diagnosis and is paid to the contractor. Repairs are quoted on site.</p>' + photos() + cancelBox() + findLink;
   } else if (!D.alerted) {
     h = '<div><h1>No ' + esc(T().pro) + ' near you yet</h1><p class="sub">We don\'t have ' + (/^[aeiou]/i.test(T().pro) ? 'an ' : 'a ') + esc(T().pro) + ' signed up for ' + esc(D.request.county) + ' County at this hour. We won\'t pretend otherwise.</p></div>' + steps(2) +
       '<div class="notice warn">Our team has your request and has been told about the gap. If a contractor becomes available, we\'ll email you.</div>' + backup() +
-      '<p class="small sub">' + summary() + '</p>';
+      '<p class="small sub">' + summary() + '</p>' + photos() + cancelBox();
   } else if (left() > 0) {
-    h = '<div><h1>Alerting nearby contractors</h1><p class="sub">We alerted ' + D.alerted + ' licensed contractor' + (D.alerted === 1 ? '' : 's') + ' covering ' + esc(D.request.county) + ' County. Answers show up here, and we\'ll email you too.</p></div>' + steps(2) +
-      '<div class="card"><div class="split"><div><span class="pill wait"><span class="pulse"></span>Waiting for a yes</span><div class="small sub" style="margin-top:6px">' + summary() + '</div></div><div style="text-align:right"><div class="timer" id="timer">' + mmss(left()) + '</div><div class="small sub">until we show backups</div></div></div></div>' +
-      '<p class="small sub">You can close this page. Your link is in your email.</p>';
+    h = '<div><h1>' + (D.reopened ? 'Sending your request out again' : 'Alerting nearby contractors') + '</h1><p class="sub">We alerted ' + D.alerted + ' licensed contractor' + (D.alerted === 1 ? '' : 's') + ' covering ' + esc(D.request.county) + ' County. Answers show up here, and we\'ll email you too.</p></div>' + steps(2) +
+      typicalLine() + (D.widened_to && D.widened_to.length ? '<div class="notice" style="background:var(--accent-soft);color:var(--accent-deep)">No answer yet, so we reminded those pros and also alerted pros in nearby ' + esc(D.widened_to.join(', ').replace(/, ([^,]*)$/, ' and $1')) + ' County.</div>' : '') + autoCard() + detailsCard() + alertCard() + '<div class="card"><div class="split"><div><span class="pill wait"><span class="pulse"></span>Waiting for a yes</span><div class="small sub" style="margin-top:6px">' + summary() + '</div></div><div style="text-align:right"><div class="timer" id="timer">' + mmss(left()) + '</div><div class="small sub">until we show backups</div></div></div></div>' +
+      '<p class="small sub">You can close this page. Your link is in your email.</p>' + photos() + contactBox() + cancelBox() + findLink;
   } else {
     h = '<div><h1>No one has confirmed yet</h1><p class="sub">We alerted ' + D.alerted + ' contractor' + (D.alerted === 1 ? '' : 's') + ' and none has accepted in ' + SITE.windowMin + ' minutes. Here\'s what you can do now.</p></div>' + steps(2) + backup() +
-      '<div class="notice warn">Your request stays open. If a contractor accepts later, it appears here and we email you.</div><p class="small sub">' + summary() + '</p>';
+      '<div class="notice warn">Your request stays open. If a contractor accepts later, it appears here and we email you.</div>' + detailsCard() + alertCard() + '<p class="small sub">' + summary() + '</p>' + photos() + cancelBox() + findLink;
   }
   app.innerHTML = h;
 }
 async function load() {
   try {
     var d = await api('/api/requests?token=' + encodeURIComponent(token || ''));
+    var count = d.state === 'open' ? d.offers.length : -1;
+    if (seen !== null && d.state === 'matched' && D && D.state === 'open') announce('Booked: ' + d.chosen.company + ' is coming');
+    else if (seen !== null && count > seen) announce('(' + count + ') ' + (count === 1 ? 'A pro can come' : count + ' pros can come'));
+    seen = count;
     D = d; skew = d.now - Date.now();
     if (!busy) render();
-    if (d.state !== 'open') clearInterval(poll);
+    if (d.state === 'closed' || d.state === 'canceled' || (d.state === 'matched' && d.reviewed)) clearInterval(poll);
   } catch (e) {
     if (!D) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div><div><a class="btn" href="/request">Start a new request</a></div>'; clearInterval(poll); }
   }
 }
 app.addEventListener('click', async function (e) {
+  if (e.target.closest('[data-alertme]')) {
+    try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (x) {}
+    alertOn = true; chime(); render(); track('offer_alerts_on');
+    try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (x) {}
+    return;
+  }
+  var sw = e.target.closest('[data-switch]');
+  if (sw && !busy) {
+    busy = true; sw.disabled = true; sw.textContent = 'Switching...';
+    try { await api('/api/requests', { token: token, action: 'noshow', offer_id: sw.dataset.switch }); track('switched_pro'); busy = false; panel = null; await load(); window.scrollTo(0, 0); }
+    catch (x) { busy = false; sw.disabled = false; sw.textContent = 'Switch to them'; var ne = document.getElementById('nerr'); if (ne) { ne.textContent = x.message; ne.hidden = false; } }
+    return;
+  }
+  var p = e.target.closest('[data-panel]'), act = e.target.closest('[data-do]');
+  if (p) { panel = p.dataset.panel || null; render(); return; }
+  if (act && !busy) {
+    var errEl = document.getElementById(act.dataset.do === 'cancel' ? 'cerr' : 'nerr');
+    busy = true; act.disabled = true; act.textContent = act.dataset.do === 'cancel' ? 'Canceling...' : 'Sending...';
+    try { await api('/api/requests', { token: token, action: act.dataset.do, reason: act.dataset.do === 'cancel' ? document.getElementById('why').value : undefined }); track(act.dataset.do === 'cancel' ? 'request_canceled' : 'no_show_reported'); busy = false; panel = null; await load(); window.scrollTo(0, 0); }
+    catch (x) { busy = false; act.disabled = false; act.textContent = 'Try again'; if (errEl) { errEl.textContent = x.message; errEl.hidden = false; } }
+    return;
+  }
   var c = e.target.closest('[data-choose]'), y = e.target.closest('[data-confirm]');
   if (c) { confirming = c.dataset.choose; render(); }
   else if (e.target.closest('[data-cancel]')) { confirming = null; render(); }
   else if (y && !busy) {
     busy = true; render();
-    try { await api('/api/choose', { token: token, offer_id: y.dataset.confirm }); busy = false; confirming = null; await load(); window.scrollTo(0, 0); }
+    var cn = document.getElementById('cname'), ca = document.getElementById('caddr');
+    if (cn && ca) ME.save({ name: cn.value.trim(), address: ca.value.trim() });
+    try { await api('/api/choose', { token: token, offer_id: y.dataset.confirm, name: cn ? cn.value.trim() : undefined, address: ca ? ca.value.trim() : undefined }); busy = false; confirming = null; await load(); window.scrollTo(0, 0); }
     catch (x) { busy = false; confirming = null; await load(); var err = document.getElementById('err'); if (err) { err.textContent = x.message; err.hidden = false; } }
   }
+});
+app.addEventListener('submit', async function (e) {
+  if (e.target.id === 'contact') {
+    e.preventDefault();
+    var fp = document.getElementById('fphone').value.trim(), fm = document.getElementById('femail').value.trim(), fe = document.getElementById('ferr'), fg = document.getElementById('fgo');
+    fe.hidden = true; fg.disabled = true; fg.textContent = 'Saving...';
+    try { await api('/api/requests', { token: token, action: 'contact', phone: fp, email: fm }); ME.save({ phone: fp, email: fm }); track('contact_fixed'); panel = null; await load(); }
+    catch (x) { fe.textContent = x.message; fe.hidden = false; fg.disabled = false; fg.textContent = 'Save'; }
+    return;
+  }
+  if (e.target.id === 'details') {
+    e.preventDefault();
+    var dn = document.getElementById('dname').value.trim(), da = document.getElementById('daddr').value.trim(), de = document.getElementById('derr'), dg = document.getElementById('dgo');
+    de.hidden = true; dg.disabled = true; dg.textContent = 'Saving...';
+    try { var out = await api('/api/requests', { token: token, action: 'details', name: dn, address: da }); ME.save({ name: dn, address: da }); track('details_added'); await load(); if (out.matched) window.scrollTo(0, 0); }
+    catch (x) { de.textContent = x.message; de.hidden = false; dg.disabled = false; dg.textContent = 'Save'; }
+    return;
+  }
+  if (e.target.id !== 'review') return;
+  e.preventDefault();
+  var pick = document.querySelector('input[name=rating]:checked'), err = document.getElementById('rerr');
+  if (!pick) { err.textContent = 'Pick 1 to 5.'; err.hidden = false; return; }
+  var ot = document.querySelector('input[name=ontime]:checked');
+  try { await api('/api/review', { token: token, rating: Number(pick.value), showed_up: true, on_time: ot ? ot.value === 'yes' : undefined, review: document.getElementById('rtext').value }); track('review_sent'); await load(); }
+  catch (x) { err.textContent = x.message; err.hidden = false; }
+});
+app.addEventListener('input', function (e) { if (/^[dc](name|addr)$/.test(e.target.id)) typed[e.target.id] = e.target.value; });
+app.addEventListener('change', async function (e) {
+  if (e.target.id !== 'addph' || !e.target.files.length) return;
+  var msg = document.getElementById('phmsg'); e.target.disabled = true; msg.textContent = 'Uploading...';
+  var r = await uploadPhotos(token, e.target.files, D.max_photos - D.photos.length);
+  if (r.sent) track('photo_added');
+  await load();
+  var m2 = document.getElementById('phmsg'); if (m2) m2.textContent = r.error || (r.sent ? 'Added.' : '');
 });
 var wasWaiting = false;
 setInterval(function () {
@@ -98,7 +263,8 @@ setInterval(function () {
   if (left() > 0) { wasWaiting = true; if (t) t.textContent = mmss(left()); }
   else if (wasWaiting) { wasWaiting = false; load(); }
 }, 1000);
-poll = setInterval(function () { if (!confirming) load(); }, 5000);
+// Refresh every few seconds, but never while a question is open or a photo is uploading.
+poll = setInterval(function () { var f = document.getElementById('addph'); if (!confirming && !panel && !busy && !(f && f.disabled) && !(document.activeElement && /TEXTAREA|SELECT|INPUT/.test(document.activeElement.tagName)) && !document.querySelector('#review input:checked') && !((document.getElementById('rtext') || {}).value)) load(); }, 5000);
 load();
 </script>
 </body>

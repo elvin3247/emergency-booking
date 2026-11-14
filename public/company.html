@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- seo:start -->
+<title>Company profile | YourBrand</title>
+<meta name="robots" content="noindex">
+<!-- seo:end -->
+<!-- head:start -->
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#E9EDF1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+<!-- head:end -->
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="narrow" id="app"><p class="sub">Loading...</p></div></div></main>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+// A contractor's public profile: who they are, what they're licensed for, and what customers said.
+var app = document.getElementById('app'), id = new URLSearchParams(location.search).get('id');
+var STAR = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="color:#D08A1E;vertical-align:-2px"><path d="M12 2l3 6.5 7 .8-5.2 4.8 1.5 7L12 17.6 5.7 21.1l1.5-7L2 9.3l7-.8z"/></svg>';
+var month = function (iso) { return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); };
+api('/api/company?id=' + encodeURIComponent(id || '')).then(function (d) {
+  document.title = d.company + ' | ' + SITE.brand;
+  var trades = d.trades.map(function (t) { return (SITE.trades[t] || { name: t }).name; }).join(', '), R = d.reviews;
+  var h = '<div class="stack"><p class="eyebrow">' + esc(trades) + '</p><h1>' + esc(d.company) + '</h1>' +
+    '<p class="sub">' + [d.years_in_business != null ? d.years_in_business + ' years in business' : '', 'On ' + esc(SITE.brand) + ' since ' + month(d.member_since)].filter(Boolean).join(' · ') + '</p></div>';
+  h += '<div class="kpis"><div><b>' + (R.avg != null ? STAR + ' ' + R.avg.toFixed(1) : 'New') + '</b><span>' + (R.avg != null ? 'from ' + R.count + ' reviews' : R.count ? R.count + ' review' + (R.count === 1 ? '' : 's') + ' so far' : 'no reviews yet') + '</span></div>' +
+    (R.on_time != null ? '<div><b>' + R.on_time + '%</b><span>arrived when promised</span></div>' : '') +
+    (d.visit_fee != null ? '<div><b>$' + esc(d.visit_fee) + '</b><span>usual visit fee</span></div>' : '') + '</div>';
+  if (d.about) h += '<div class="card"><h3>About</h3><p>' + esc(d.about) + '</p></div>';
+  h += '<div class="card"><h3>Licensed and checked</h3><dl class="kv"><dt>License</dt><dd>' + esc(d.license) + '</dd><dt>Work</dt><dd>' + esc(trades) + '</dd><dt>Serves</dt><dd>' + esc(d.counties.join(', ')) + ' ' + (d.counties.length === 1 ? 'County' : 'counties') + '</dd>' +
+    (d.website ? '<dt>Website</dt><dd><a href="' + esc(d.website) + '" target="_blank" rel="noopener nofollow">' + esc(d.website.replace(/^https?:\/\//, '')) + '</a></dd>' : '') + '</dl>' +
+    '<p class="small sub">We checked this license with the state before the company could get requests. Independent company, not our employee.</p></div>';
+  h += '<div class="card"><h3>What customers said</h3>' + (R.recent.length ? R.recent.map(function (r) { return '<div class="review"><b>' + STAR + ' ' + r.rating + ' of 5</b><p>' + esc(r.text) + '</p><span class="small sub">' + month(r.at) + '</span></div>'; }).join('') : '<p class="sub">No written reviews yet. Reviews come only from customers who booked through ' + esc(SITE.brand) + '.</p>') + '</div>';
+  h += '<p class="small sub">Every review is from a real request on this site. Companies can\'t pay to change their rating.</p>';
+  h += '<div class="btns"><a class="btn" href="/request">Request help now</a></div>';
+  app.innerHTML = h;
+}).catch(function (e) { app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div><div><a class="btn" href="/">Back to home</a></div>'; });
+</script>
+<div id="site-footer"></div>
+</body>
+</html>

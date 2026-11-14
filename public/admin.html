@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- seo:start -->
+<title>Admin | YourBrand</title>
+<meta name="robots" content="noindex">
+<!-- seo:end -->
+<!-- head:start -->
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#E9EDF1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+<!-- head:end -->
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="admin" id="app"></div></div></main>
+<div class="toast" id="toast" role="status" hidden></div>
+<div id="site-footer"></div>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+// The owner's page: approve contractors, watch requests, and track lead fees. Locked by the ADMIN_KEY you set in Vercel.
+var app = document.getElementById('app'), D = null, tab = 'todo', toastT, editing = null, removing = null;
+var KEY = ''; try { KEY = sessionStorage.getItem('adminKey') || ''; } catch (e) {}
+function toast(m) { var el = document.getElementById('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { el.hidden = true; }, 3500); }
+async function call(body) {
+  var res = await fetch('/api/admin', { method: body ? 'POST' : 'GET', cache: 'no-store', headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY }, body: body ? JSON.stringify(body) : undefined });
+  var data = await res.json().catch(function () { return {}; });
+  if (!res.ok) throw Object.assign(new Error(data.error || 'Something went wrong.'), { status: res.status });
+  return data;
+}
+var when = function (iso) { return iso ? new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
+var money = function (n) { return '$' + Number(n || 0).toLocaleString('en-US'); };
+var tradeNames = function (c) { return c.trades.map(function (t) { return (SITE.trades[t] || { name: t }).name; }).join(', '); };
+var table = function (heads, rows, empty) { return rows.length ? '<div class="tablewrap"><table class="list"><thead><tr>' + heads.map(function (h) { return '<th scope="col">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' : '<p class="sub">' + empty + '</p>'; };
+var statusPill = function (c) {
+  if (c.status === 'pending') return '<span class="pill wait">Waiting on you</span>';
+  if (c.status === 'paused') return '<span class="pill bad">Paused by you</span>';
+  if (!c.setup_complete) return '<span class="pill wait">Approved, setup not finished</span>';
+  return c.self_paused ? '<span class="pill plain">Approved, paused themselves</span>' : '<span class="pill ok">Approved</span>';
+};
+var statePill = function (r) {
+  if (r.state === 'canceled') return '<span class="pill plain">Canceled by customer</span>';
+  if (r.state === 'matched') return '<span class="pill ok">Matched</span>';
+  if (!r.alerted) return '<span class="pill bad">No one to alert</span>';
+  if (r.state === 'open') return '<span class="pill wait">' + (r.accepted ? r.accepted + ' said yes' : 'Waiting') + '</span>';
+  return '<span class="pill plain">Closed, ' + (r.accepted ? 'not chosen' : 'no answer') + '</span>';
+};
+var contractorRow = function (c) {
+  if (editing === c.id) return editRow(c);
+  var acts = (c.status === 'approved' ? '<button class="btn sm ghost" type="button" data-status="paused" data-id="' + c.id + '">Pause</button>'
+    : '<button class="btn sm" type="button" data-status="approved" data-id="' + c.id + '">Approve</button>') + '<button class="btn sm ghost" type="button" data-edit="' + c.id + '">Edit</button>';
+  return '<tr><td><b>' + esc(c.company) + '</b><br><span class="sub">' + esc(c.contact || '') + ' · ' + esc(c.email) + ' · ' + esc(c.mobile) + '</span><br><span class="sub small">Applied ' + when(c.created_at) + (c.source ? ' · from ' + esc(c.source) : '') + '</span></td>' +
+    '<td>' + esc(tradeNames(c)) + '<br><span class="sub">License ' + esc(c.license) + '</span></td>' +
+    '<td>' + esc(c.counties.join(', ')) + '</td>' +
+    '<td class="num">' + (c.visit_fee == null ? '<span class="sub">Not set</span>' : money(c.visit_fee)) + '<br><span class="sub small">' + esc(SITE.alertHours[c.alert_hours] || '') + '</span></td>' +
+    '<td class="num">' + (c.reviews ? c.reviews.avg + ' of 5<br><span class="sub small">' + c.reviews.count + ' review' + (c.reviews.count === 1 ? '' : 's') + '</span>' : '<span class="sub">None yet</span>') + '</td>' +
+    '<td class="num">' + (c.owed ? '<b>' + money(c.owed) + '</b>' : '<span class="sub">$0</span>') + '<br><span class="sub small">' + c.free_leads_left + ' free left</span></td>' +
+    '<td>' + statusPill(c) + '<div class="acts" style="margin-top:6px">' + acts + '</div></td></tr>';
+};
+// Edit what a contractor can't change themselves (company, license, trades, counties, business phone).
+var boxes = function (name, all, on, label) { return '<div class="chips">' + all.map(function (k) { return '<label class="chip" for="' + name + k.replace(/\W/g, '') + '"><input type="checkbox" id="' + name + k.replace(/\W/g, '') + '" name="' + name + '" value="' + esc(k) + '"' + (on.indexOf(k) > -1 ? ' checked' : '') + '><span>' + esc(label ? label(k) : k) + '</span></label>'; }).join('') + '</div>'; };
+var editRow = function (c) {
+  return '<tr><td colspan="7"><form class="stack" id="editc" data-id="' + c.id + '"><div class="row"><div><label for="ec">Company</label><input type="text" id="ec" value="' + esc(c.company) + '"></div><div><label for="el">License number(s)</label><input type="text" id="el" value="' + esc(c.license) + '"></div></div>' +
+    '<div class="row"><div><label for="ep">Business phone</label><input type="tel" id="ep" value="' + esc(c.business_phone || '') + '"></div><div></div></div>' +
+    '<div><label>Trades</label>' + boxes('et', Object.keys(SITE.trades), c.trades, function (k) { return SITE.trades[k].name; }) + '</div>' +
+    '<div><label>Counties</label>' + boxes('eco', SITE.counties, c.counties) + '</div>' +
+    '<div class="btns"><button class="btn sm" type="submit">Save</button><button class="btn sm ghost" type="button" data-noedit>Cancel</button></div></form></td></tr>';
+};
+var CHEADS = ['Company', 'Trade and license', 'Counties', 'Visit fee', 'Reviews', 'Owes', 'Status'];
+var requestRow = function (r) {
+  var svc = (SITE.services[r.service] || { name: '' }).name, prob = (SITE.problems[r.problem] || [r.problem])[0];
+  return '<tr><td class="num">' + when(r.created_at) + '</td><td><b>' + esc(prob) + '</b><br><span class="sub">' + esc(svc) + ' · ' + esc(r.timing) + '</span></td>' +
+    '<td>' + esc(r.county) + ' ' + esc(r.zip) + '</td>' +
+    '<td>' + esc(r.name) + '<br><span class="sub">' + esc(r.phone) + ' · ' + esc(r.email) + '</span>' + (r.source ? '<br><span class="sub small">from ' + esc(r.source) + '</span>' : '') + '</td>' +
+    '<td>' + statePill(r) + '<br><span class="sub small">' + r.alerted + ' alerted' + (r.first_yes_min != null ? ' · first yes in ' + r.first_yes_min + ' min' : '') + (r.reopened ? ' · sent out again after a no-show' : '') + (r.cancel_reason ? ' · ' + esc(r.cancel_reason) : '') + (r.photos ? ' · ' + r.photos + ' photo' + (r.photos === 1 ? '' : 's') : '') + (r.chosen ? ' · chose ' + esc(r.chosen) : '') + '</span></td>' +
+    '<td>' + (r.rating ? '<b>' + r.rating + ' of 5</b>' + (r.review_hidden ? ' <span class="pill plain">Hidden</span>' : '') + (r.showed_up === false ? ' <span class="pill bad">No-show</span>' : '') + (r.review ? '<br><span class="sub small">' + esc(r.review) + '</span>' : '') + '<br><button class="quiet" type="button" data-hide="' + r.id + '" data-hidden="' + (r.review_hidden ? 'false' : 'true') + '">' + (r.review_hidden ? 'Show review' : 'Hide review') + '</button>' : '<span class="sub">None</span>') + '</td>' +
+    '<td><a href="/status?t=' + encodeURIComponent(r.token) + '">Open</a>' + (r.state === 'canceled' ? '' : '<br><button class="quiet" type="button" data-remove="' + r.id + '">' + (removing === r.id ? 'Sure? Remove it' : 'Remove (spam)') + '</button>') + '</td></tr>';
+};
+var RHEADS = ['When', 'Problem', 'Where', 'Customer', 'Outcome', 'Review', 'Page'];
+
+// One lead fee: what happened, and the buttons that apply to it.
+var RESULT = { done: 'Pro: job done', canceled: 'Pro: customer canceled', no_contact: 'Pro: couldn\'t reach customer' };
+var FHEADS = ['When', 'Contractor', 'Fee', 'What happened', 'Status', ''];
+var feeRow = function (f) {
+  var what = [f.no_show ? 'Customer reported no-show' : '', RESULT[f.job_result] || ''].filter(Boolean).join('. ') || 'Job won';
+  var status = f.fee_review ? '<span class="pill bad">Needs your decision</span>' : f.paid_at ? '<span class="pill ok">Paid ' + when(f.paid_at) + '</span>' : f.lead_fee ? '<span class="pill wait">Owed</span>' : '<span class="pill plain">Waived</span>';
+  var acts = f.fee_review ? '<button class="btn sm ghost" type="button" data-fee="waive" data-id="' + f.id + '">Waive</button><button class="btn sm" type="button" data-fee="keep" data-id="' + f.id + '">Keep fee</button>'
+    : f.paid_at ? '<button class="btn sm ghost" type="button" data-fee="unpaid" data-id="' + f.id + '">Undo</button>'
+    : f.lead_fee ? '<button class="btn sm" type="button" data-fee="paid" data-id="' + f.id + '">Mark paid</button><button class="btn sm ghost" type="button" data-fee="waive" data-id="' + f.id + '">Waive</button>' : '';
+  return '<tr><td class="num">' + when(f.at) + '</td><td><b>' + esc(f.company) + '</b></td><td class="num">' + money(f.lead_fee) + '</td><td>' + esc(what) + '</td><td>' + status + '</td><td><div class="acts">' + acts + '</div></td></tr>';
+};
+function gate(msg) {
+  app.innerHTML = '<div class="narrow"><h1>Admin</h1><p class="sub">Enter the admin key you set as ADMIN_KEY in Vercel.</p>' +
+    '<form class="card" id="gate"><div><label for="key">Admin key</label><input type="text" id="key" autocomplete="off" autocapitalize="off" spellcheck="false"></div>' +
+    (msg ? '<p class="err" role="alert">' + esc(msg) + '</p>' : '') + '<div><button class="btn" type="submit">Open</button></div></form></div>';
+}
+function render() {
+  var C = D.contractors, R = D.requests, week = Date.now() - 7 * 864e5;
+  var pending = C.filter(function (c) { return c.status === 'pending'; });
+  var gaps = R.filter(function (r) { return !r.alerted && new Date(r.created_at).getTime() > week; });
+  var bad = R.filter(function (r) { return ((r.rating && (r.rating <= 2 || r.showed_up === false)) || r.reopened) && new Date(r.created_at).getTime() > week * 1 - 23 * 864e5; });
+  var reviews = D.fees.filter(function (f) { return f.fee_review; });
+  var unpaid = D.fees.filter(function (f) { return !f.paid_at && !f.fee_review; }), owed = unpaid.reduce(function (t, f) { return t + f.lead_fee; }, 0);
+  var live = C.filter(function (c) { return c.status === 'approved' && c.setup_complete; }).length;
+  var recent = R.filter(function (r) { return new Date(r.created_at).getTime() > week; });
+  var todo = pending.length + gaps.length + bad.length + reviews.length;
+  // The 90-day test goals from the business plan, over the last 7 days of requests where someone was alerted.
+  var asked = recent.filter(function (r) { return r.alerted; }), firsts = asked.map(function (r) { return r.first_yes_min; }).filter(function (v) { return v != null; }).sort(function (a, b) { return a - b; });
+  var median = firsts.length ? firsts[Math.floor((firsts.length - 1) / 2)] : null;
+  var pct = function (n, d) { return d ? Math.round(n / d * 100) + '%' : 'n/a'; };
+  var tabs = [['todo', 'Needs you', todo], ['contractors', 'Contractors (' + C.length + ')'], ['requests', 'Requests'], ['funnel', 'Funnel and invites'], ['fees', 'Lead fees', 0]];
+  var h = '<div class="split"><h1>Admin</h1><div class="btns"><button class="btn sm ghost" type="button" data-daily>Run daily tasks now</button><button class="btn sm ghost" type="button" data-refresh>Refresh</button><button class="btn sm ghost" type="button" data-lock>Lock</button></div></div>' +
+    '<div class="kpis"><div><b>' + live + '</b><span>pros taking requests</span></div><div><b>' + recent.length + '</b><span>requests, last 7 days</span></div>' +
+    '<div><b>' + recent.filter(function (r) { return r.state === 'matched'; }).length + '</b><span>matched, last 7 days</span></div><div><b>' + gaps.length + '</b><span>with no one to alert</span></div><div><b>' + money(owed) + '</b><span>lead fees owed to you</span></div></div>' +
+    '<h2 style="font-size:1.15rem">Test goals, last 7 days</h2><div class="kpis">' +
+    '<div><b>' + (median == null ? 'n/a' : median + ' min') + '</b><span>typical time to first yes (goal: under 10)</span></div>' +
+    '<div><b>' + pct(firsts.length, asked.length) + '</b><span>got at least one yes (goal: 70%)</span></div>' +
+    '<div><b>' + pct(recent.filter(function (r) { return r.state === 'matched'; }).length, recent.length) + '</b><span>ended in a match (plan assumes 60%)</span></div>' +
+    '<div><b>' + pct(recent.filter(function (r) { return r.on_time === true; }).length, recent.filter(function (r) { return r.on_time != null; }).length) + '</b><span>arrived on time (goal: 90%)</span></div>' +
+    '<div><b>' + pct(recent.filter(function (r) { return r.reopened; }).length, recent.filter(function (r) { return r.state === 'matched' || r.reopened; }).length) + '</b><span>matches with a no-show</span></div></div>' +
+    '<div class="tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" role="tab" aria-selected="' + (tab === t[0]) + '" data-tab="' + t[0] + '">' + t[1] + (t[2] ? '<b>' + t[2] + '</b>' : '') + '</button>'; }).join('') + '</div>';
+  if (tab === 'todo') {
+    h += '<h2>Applications to check</h2><p class="sub">Look up each license with the state board for that trade before you approve. Approving sends them an email.</p>' + table(CHEADS, pending.map(contractorRow), 'No applications waiting.') +
+      '<h2>Requests with no one to alert</h2><p class="sub">Last 7 days. These are the counties and services to recruit for first. Call the customer if you can help them yourself.</p>' + table(RHEADS, gaps.map(requestRow), 'None. Every request had someone to alert.') +
+      '<h2>Lead fees to decide</h2><p class="sub">The customer canceled, reported a no-show, or the pro says they couldn\'t reach the customer. Waive the fee or keep it.</p>' + table(FHEADS, reviews.map(feeRow), 'Nothing to decide.') +
+      '<h2>Low ratings and no-shows</h2>' + table(RHEADS, bad.map(requestRow), 'None in the last 30 days.');
+  } else if (tab === 'contractors') {
+    h += table(CHEADS, C.map(contractorRow), 'No contractors have applied yet.');
+  } else if (tab === 'funnel') {
+    // Where people drop off, last 7 days. Site steps are unique devices; the rest come from the requests themselves.
+    var F = D.funnel || {}, step = function (label, n, of) { return '<tr><td>' + label + '</td><td class="num"><b>' + (n || 0) + '</b></td><td class="num sub">' + (of ? pct(n || 0, of) : '') + '</td></tr>'; };
+    var sent = recent.length, yes = asked.filter(function (r) { return r.first_yes_min != null; }).length, matched = recent.filter(function (r) { return r.state === 'matched'; }).length, reviewed = recent.filter(function (r) { return r.rating; }).length;
+    h += '<h2>Homeowners, last 7 days</h2><div class="tablewrap"><table class="list"><thead><tr><th>Step</th><th>Count</th><th>Of the step before</th></tr></thead><tbody>' +
+      step('Started on the home page booking card', F.request_started) + step('Opened the request form', F.form_opened) + step('Sent a request', sent, F.form_opened) + step('Got at least one yes', yes, sent) + step('Chose a pro', matched, yes) + step('Left a review', reviewed, matched) + '</tbody></table></div>' +
+      '<p class="small sub">Also: ' + (F.offer_alerts_on || 0) + ' turned on offer alerts, ' + (F.details_added || 0) + ' added details while waiting, ' + (F.photo_added || 0) + ' added photos, ' + (F.switched_pro || 0) + ' switched to a standby pro, ' + (F.request_canceled || 0) + ' canceled, ' + (F.links_requested || 0) + ' asked for their link by email.</p>' +
+      '<h2>Contractors, last 7 days</h2><div class="tablewrap"><table class="list"><tbody>' + step('Started the sign-up form', F.pro_apply_started) + step('Applied', F.pro_applied, F.pro_apply_started) + step('Confirmed a job after being chosen', F.pro_confirmed) + step('Sent "On my way"', F.pro_eta_on_way) + '</tbody></table></div>' +
+      '<h2>Invite a contractor</h2><p class="sub">After a recruiting call: they get an email with a sign-up link, their email already filled in.</p>' +
+      '<form class="card" id="invite" style="max-width:560px"><div class="row"><div><label for="iname">Their name (optional)</label><input type="text" id="iname"></div><div><label for="iemail">Their email</label><input type="email" id="iemail"></div></div><div><button class="btn sm" type="submit">Send invite</button></div></form>';
+  } else if (tab === 'requests') {
+    h += '<p class="sub">The latest 100 requests.</p>' + table(RHEADS, R.map(requestRow), 'No requests yet.');
+  } else {
+    h += '<p class="sub">You collect these yourself for now (invoice, Venmo, check). Mark each one when it\'s paid. Waive a fee if the pro never reached the customer.</p>' +
+      table(FHEADS, D.fees.map(feeRow), (SITE.freeLaunch ? 'No lead fees: the site is free for contractors during the launch (freeLaunch in config.js).' : 'No paid leads yet. The first ' + SITE.freeLeads + ' chosen leads for each pro are free.'));
+  }
+  app.innerHTML = h;
+}
+async function load() {
+  if (!KEY) return gate();
+  try { D = await call(); render(); }
+  catch (e) { if (e.status === 401 || e.status === 503) { KEY = ''; try { sessionStorage.removeItem('adminKey'); } catch (x) {} gate(e.message); } else if (D) toast(e.message); else app.innerHTML = '<div class="notice crit">' + esc(e.message) + '</div>'; }
+}
+app.addEventListener('submit', async function (e) {
+  if (e.target.id === 'editc' || e.target.id === 'invite') {
+    e.preventDefault();
+    var v = function (id) { return document.getElementById(id).value.trim(); }, checked = function (n) { return Array.prototype.map.call(document.querySelectorAll('input[name=' + n + ']:checked'), function (i) { return i.value; }); };
+    var body = e.target.id === 'invite' ? { action: 'invite', email: v('iemail'), name: v('iname') } : { action: 'edit_contractor', id: e.target.dataset.id, company: v('ec'), license: v('el'), business_phone: v('ep'), trades: checked('et'), counties: checked('eco') };
+    try { await call(body); toast(body.action === 'invite' ? 'Invite sent.' : 'Saved.'); editing = null; await load(); } catch (x) { toast(x.message); }
+    return;
+  }
+  if (e.target.id !== 'gate') return;
+  e.preventDefault(); KEY = document.getElementById('key').value.trim(); try { sessionStorage.setItem('adminKey', KEY); } catch (x) {} load();
+});
+app.addEventListener('click', async function (e) {
+  var t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.tab) { tab = t.dataset.tab; return render(); }
+  if (t.hasAttribute('data-refresh')) return load();
+  if (t.dataset.edit) { editing = t.dataset.edit; return render(); }
+  if (t.hasAttribute('data-noedit')) { editing = null; return render(); }
+  if (t.dataset.remove && removing !== t.dataset.remove) { removing = t.dataset.remove; return render(); }
+  if (t.hasAttribute('data-daily')) {
+    t.disabled = true; t.textContent = 'Running...';
+    try { var d = await call({ action: 'daily' }); toast('Done: ' + d.reminders + ' review reminders, ' + d.closed + ' closed-request emails, ' + d.photos + ' old photos deleted.'); await load(); } catch (x) { toast(x.message); t.disabled = false; t.textContent = 'Run daily tasks now'; }
+    return;
+  }
+  if (t.hasAttribute('data-lock')) { KEY = ''; D = null; try { sessionStorage.removeItem('adminKey'); } catch (x) {} return gate(); }
+  var body = t.dataset.status ? { action: 'status', id: t.dataset.id, status: t.dataset.status } : t.dataset.fee ? { action: t.dataset.fee, id: t.dataset.id }
+    : t.dataset.remove ? { action: 'cancel_request', id: t.dataset.remove } : t.dataset.hide ? { action: 'hide_review', id: t.dataset.hide, hidden: t.dataset.hidden === 'true' } : null;
+  if (!body) return;
+  t.disabled = true;
+  try { await call(body); toast(body.status === 'approved' ? 'Approved. They\'ve been emailed.' : body.status ? 'Paused. They won\'t get requests.' : body.action === 'waive' ? 'Fee waived.' : body.action === 'keep' ? 'Fee kept.' : body.action === 'cancel_request' ? 'Request removed.' : body.action === 'hide_review' ? (body.hidden ? 'Review hidden.' : 'Review shown.') : 'Saved.'); await load(); }
+  catch (x) { t.disabled = false; toast(x.message); }
+});
+load();
+</script>
+</body>
+</html>

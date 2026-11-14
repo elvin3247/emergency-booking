@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- seo:start -->
-<title>Emergency Repair Leads in New Jersey: Pay Only When Chosen | YourBrand</title>
-<meta name="description" content="HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. First 3 chosen leads free, then $50 only when a customer picks you. No monthly fee.">
+<title>Free Emergency Repair Leads in New Jersey for Licensed Pros | YourBrand</title>
+<meta name="description" content="HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. Free during our launch: no lead fees, no monthly fee.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="YourBrand">
-<meta property="og:title" content="Emergency Repair Leads in New Jersey: Pay Only When Chosen">
-<meta property="og:description" content="HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. First 3 chosen leads free, then $50 only when a customer picks you. No monthly fee.">
+<meta property="og:title" content="Free Emergency Repair Leads in New Jersey for Licensed Pros">
+<meta property="og:description" content="HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. Free during our launch: no lead fees, no monthly fee.">
 <meta name="twitter:card" content="summary_large_image">
 <!-- seo:end -->
 <!-- head:start -->
@@ -53,9 +53,8 @@
       </div>
       <div class="stack">
         <h2>The deal</h2>
-        <ul class="deal">
-          <li><b><span class="free-leads">3</span> free leads</b><span>Your first chosen leads cost nothing.</span></li>
-          <li><b>$<span class="lead-fee">50</span> per chosen lead</b><span>Only when a customer picks you. Responding is free.</span></li>
+        <ul class="deal" id="deal">
+          <li><b>Free during our launch</b><span>No lead fees and no monthly fee while we build the network. If that ever changes, you'll hear from us at least 30 days ahead.</span></li>
           <li><b>No monthly fee</b><span>No contract. Stop anytime.</span></li>
           <li><b>Exclusive</b><span>The customer's details go to you alone.</span></li>
           <li><b>Pause anytime</b><span>Busy week? Pause alerts with one tap. Saying no never counts against you.</span></li>
@@ -87,11 +86,16 @@
 <script src="/assets/config.js"></script>
 <script src="/assets/site.js"></script>
 <script>
-document.querySelectorAll('.free-leads').forEach(function (e) { e.textContent = SITE.freeLeads; });
-document.querySelectorAll('.lead-fee').forEach(function (e) { e.textContent = SITE.leadFee; });
+// When the free launch ends, the deal shows the per-lead price instead.
+if (!SITE.freeLaunch) document.getElementById('deal').firstElementChild.outerHTML = '<li><b>' + SITE.freeLeads + ' free leads</b><span>Your first chosen leads cost nothing.</span></li><li><b>$' + SITE.leadFee + ' per chosen lead</b><span>Only when a customer picks you. Responding is free.</span></li>';
 document.getElementById('trades').innerHTML = Object.keys(SITE.trades).map(function (t) { return '<label class="chip" for="t-' + t + '"><input type="checkbox" id="t-' + t + '" value="' + t + '"><span>' + SITE.trades[t].name + '</span></label>'; }).join('');
 document.getElementById('chips').innerHTML = SITE.counties.map(function (c, i) { return '<label class="chip" for="c' + i + '"><input type="checkbox" id="c' + i + '" value="' + c + '"><span>' + c + '</span></label>'; }).join('');
 document.getElementById('consent-text').innerHTML = esc(SITE.consent.contractor) + ' See our <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.';
+// Invited after a call: their email is already filled in.
+var inv = new URLSearchParams(location.search).get('email');
+if (inv && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inv)) document.getElementById('email').value = inv;
+var startedApply = false;
+document.getElementById('f').addEventListener('input', function () { if (!startedApply) { startedApply = true; track('pro_apply_started'); } });
 document.getElementById('f').addEventListener('submit', async function (e) {
   e.preventDefault();
   var v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
@@ -101,6 +105,7 @@ document.getElementById('f').addEventListener('submit', async function (e) {
       trades: Array.prototype.map.call(document.querySelectorAll('#trades input:checked'), function (i) { return i.value; }),
       counties: Array.prototype.map.call(document.querySelectorAll('#chips input:checked'), function (i) { return i.value; }), consent: document.getElementById('consent').checked });
     track('contractor_applied');
+    track('pro_applied');
     location.href = '/pro?t=' + encodeURIComponent(out.token);
   } catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Continue'; }
 });

@@ -31,7 +31,7 @@
       <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="/hvac">Heating and cooling</a> / Bergen County</nav>
       <h1>Emergency HVAC repair in Bergen County, NJ</h1>
       <p class="lede">No heat or no cooling? Tell us what's wrong. Licensed HVAC contractors who cover Bergen County and are free reply with an arrival time and visit fee. You pick one.</p>
-      <form class="book" id="book" action="/request" method="get" data-county="Bergen" data-service="heating">
+      <form class="book" id="book" action="/request" method="get" novalidate data-county="Bergen" data-service="heating">
         <fieldset class="svc"><legend>What kind of help do you need?</legend>
           <label class="chip" for="b-s-heating"><input type="radio" id="b-s-heating" name="s" value="heating" checked><span>Heating</span></label>
           <label class="chip" for="b-s-cooling"><input type="radio" id="b-s-cooling" name="s" value="cooling"><span>Cooling</span></label>
@@ -42,7 +42,7 @@
         </fieldset>
         <div class="bar">
           <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p"><optgroup label="Heating"><option value="no-heat">No heat</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></optgroup><optgroup label="Cooling"><option value="no-cooling">No cooling</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></optgroup><optgroup label="Plumbing"><option value="burst-pipe">Burst or leaking pipe</option><option value="clog">Clogged drain or backup</option><option value="toilet">Toilet problem</option><option value="sump">Sump pump not working</option><option value="other">Something else</option></optgroup><optgroup label="Water heater"><option value="no-hot-water">No hot water</option><option value="wh-leak">Water heater leaking</option><option value="other">Something else</option></optgroup></select></div>
-          <div class="z"><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="07059" required></div>
+          <div class="z"><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="5 digits" required></div>
           <input type="hidden" name="county" value="Bergen">
           <button class="btn" type="submit">Find who can come</button>
         </div>

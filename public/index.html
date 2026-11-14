@@ -13,7 +13,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"YourBrand"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Service","serviceType":"Emergency home repair","name":"Emergency heating, cooling, plumbing, and water heater repair","provider":{"@type":"Organization","name":"YourBrand"},"areaServed":{"@type":"State","name":"New Jersey"},"hoursAvailable":{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],"opens":"00:00","closes":"23:59"}}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What does it cost me?","acceptedAnswer":{"@type":"Answer","text":"Nothing to use YourBrand. You pay the pro directly for the visit and any repair you approve."}},{"@type":"Question","name":"Who are the pros?","acceptedAnswer":{"@type":"Answer","text":"Independent New Jersey companies: HVAC contractors, plumbers, and more as we grow. Each one gives us its state license number, and we check it before they can receive requests. They aren't our employees, and they set their own prices."}},{"@type":"Question","name":"How fast will someone answer?","acceptedAnswer":{"@type":"Answer","text":"It depends on who's free near you. Your request page shows each yes as it comes in, and after 15 minutes with no answer we show pros you can call directly."}},{"@type":"Question","name":"What if no one can come?","acceptedAnswer":{"@type":"Answer","text":"We tell you and show pros you can call directly. Your request stays open for 12 hours, and we email you if someone accepts later."}},{"@type":"Question","name":"Who sees my phone number?","acceptedAnswer":{"@type":"Answer","text":"Only the one pro you choose. Pros who respond see your ZIP code and the problem, not your name, number, or address."}},{"@type":"Question","name":"What is a visit fee?","acceptedAnswer":{"@type":"Answer","text":"It's what the pro charges to come out and diagnose the problem. Each one sets their own and you see it before you choose. Any repair is quoted on site, and you decide whether to go ahead."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What does it cost me?","acceptedAnswer":{"@type":"Answer","text":"Nothing to use YourBrand. You pay the pro directly for the visit and any repair you approve."}},{"@type":"Question","name":"Who are the pros?","acceptedAnswer":{"@type":"Answer","text":"Independent New Jersey companies: HVAC contractors, plumbers, and more as we grow. Each one gives us its state license number, and we check it before they can receive requests. They aren't our employees, and they set their own prices."}},{"@type":"Question","name":"How fast will someone answer?","acceptedAnswer":{"@type":"Answer","text":"It depends on who's free near you. Your request page shows each yes as it comes in, and after 15 minutes with no answer we show pros you can call directly."}},{"@type":"Question","name":"What if no one can come?","acceptedAnswer":{"@type":"Answer","text":"We tell you and show pros you can call directly. Your request stays open for 12 hours, and we email you if someone accepts later."}},{"@type":"Question","name":"Who sees my phone number?","acceptedAnswer":{"@type":"Answer","text":"Only the one pro you choose. Pros who respond see your ZIP code and the problem, not your name, number, or address."}},{"@type":"Question","name":"What is a visit fee?","acceptedAnswer":{"@type":"Answer","text":"It's what the pro charges to come out and diagnose the problem. Each one sets their own and you see it before you choose. Any repair is quoted on site, and you decide whether to go ahead."}},{"@type":"Question","name":"Which services can I request?","acceptedAnswer":{"@type":"Answer","text":"Heating, cooling, plumbing, and water heater repair today. Electrical and appliances are coming as licensed pros sign up."}}]}</script>
 <!-- seo:end -->
 <!-- head:start -->
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
@@ -43,7 +43,7 @@
         <h1>Home emergency? Find a pro near you who can come now.</h1>
         <p class="lede"><span id="hero-services">Heating, cooling, plumbing, and water heater repair.</span> Licensed local pros reply with an arrival time and visit fee. You pick.</p>
 <!-- book:start -->
-      <form class="book" id="book" action="/request" method="get">
+      <form class="book" id="book" action="/request" method="get" novalidate>
         <fieldset class="svc"><legend>What kind of help do you need?</legend>
           <label class="chip" for="b-s-heating"><input type="radio" id="b-s-heating" name="s" value="heating" checked><span>Heating</span></label>
           <label class="chip" for="b-s-cooling"><input type="radio" id="b-s-cooling" name="s" value="cooling"><span>Cooling</span></label>
@@ -54,7 +54,7 @@
         </fieldset>
         <div class="bar">
           <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p"><optgroup label="Heating"><option value="no-heat">No heat</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></optgroup><optgroup label="Cooling"><option value="no-cooling">No cooling</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></optgroup><optgroup label="Plumbing"><option value="burst-pipe">Burst or leaking pipe</option><option value="clog">Clogged drain or backup</option><option value="toilet">Toilet problem</option><option value="sump">Sump pump not working</option><option value="other">Something else</option></optgroup><optgroup label="Water heater"><option value="no-hot-water">No hot water</option><option value="wh-leak">Water heater leaking</option><option value="other">Something else</option></optgroup></select></div>
-          <div class="z"><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="07059" required></div>
+          <div class="z"><label for="b-zip">ZIP code</label><input type="text" id="b-zip" name="zip" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" autocomplete="postal-code" placeholder="5 digits" required></div>
           <input type="hidden" name="county" value="">
           <button class="btn" type="submit">Find who can come</button>
         </div>
@@ -149,11 +149,11 @@
         <p class="lede">Emergency requests in your counties, during your hours. Say yes with one tap. Saying no never counts against you.</p>
         <div><a class="btn lg" href="/contractors">Apply to join</a></div>
       </div>
-      <div class="stats">
-        <div><b><span class="free-leads">3</span> free</b><span>chosen leads to start</span></div>
-        <div><b>$<span class="lead-fee">50</span></b><span>only when a customer picks you</span></div>
+      <div class="stats" id="pro-stats">
+        <div><b>$0</b><span>lead fees during our launch</span></div>
         <div><b>$0</b><span>monthly fee, no contract</span></div>
-        <div><b>1</b><span>pro per lead</span></div>
+        <div><b>1 tap</b><span>to say yes from the alert</span></div>
+        <div><b>1</b><span>pro gets each customer's details</span></div>
       </div>
     </div></div>
   </section>
@@ -180,7 +180,9 @@
 <script src="/assets/site.js"></script>
 <script>
   var fill = function (cls, val) { document.querySelectorAll('.' + cls).forEach(function (e) { e.textContent = val; }); };
-  fill('window-min', SITE.windowMin); fill('free-leads', SITE.freeLeads); fill('lead-fee', SITE.leadFee);
+  fill('window-min', SITE.windowMin);
+  // When the free launch ends, the pro band shows the per-lead price instead.
+  if (!SITE.freeLaunch) document.getElementById('pro-stats').innerHTML = '<div><b>' + SITE.freeLeads + ' free</b><span>chosen leads to start</span></div><div><b>$' + SITE.leadFee + '</b><span>only when a customer picks you</span></div><div><b>$0</b><span>monthly fee, no contract</span></div><div><b>1</b><span>pro per lead</span></div>';
 </script>
 </body>
 </html>

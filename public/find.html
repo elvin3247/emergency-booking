@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- seo:start -->
+<title>Find your request | YourBrand</title>
+<meta name="robots" content="noindex">
+<!-- seo:end -->
+<!-- head:start -->
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#E9EDF1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/assets/styles.css">
+<!-- head:end -->
+</head>
+<body>
+<div id="site-header"></div>
+<main class="page"><div class="wrap"><div class="narrow">
+  <div class="stack"><h1>Get your link by email</h1><p class="sub">Lost the page for your request, or your contractor page? Enter the email you used and we'll send the links again.</p></div>
+  <form class="card" id="f" novalidate>
+    <div><label for="email">Email</label><input type="email" id="email" autocomplete="email" required></div>
+    <div class="hp" aria-hidden="true"><label for="website">Leave this empty</label><input type="text" id="website" tabindex="-1" autocomplete="off"></div>
+    <p class="err" id="err" role="alert" hidden></p>
+    <div><button class="btn" type="submit" id="go">Email me my links</button></div>
+  </form>
+  <div class="notice good" id="done" role="status" hidden></div>
+  <p class="small sub">Links are private and work without a password, so don't forward them. Need help now? <a href="/request">Start a new request</a>.</p>
+</div></div></main>
+<script src="/assets/config.js"></script>
+<script src="/assets/site.js"></script>
+<script>
+document.getElementById('f').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  var go = document.getElementById('go'), err = document.getElementById('err'), done = document.getElementById('done');
+  err.hidden = true; go.disabled = true; go.textContent = 'Sending...';
+  try { var r = await api('/api/links', { email: document.getElementById('email').value.trim(), website: document.getElementById('website').value }); done.textContent = r.message; done.hidden = false; e.target.hidden = true; track('links_requested'); }
+  catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = 'Email me my links'; }
+});
+</script>
+<div id="site-footer"></div>
+</body>
+</html>
