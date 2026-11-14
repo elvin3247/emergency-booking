@@ -18,7 +18,7 @@ const server = http.createServer(async (req, res) => {
   }
   const rel = path.normalize(u.pathname === '/' ? '/index.html' : u.pathname);
   const file = [path.join(PUB, rel), path.join(PUB, rel + '.html')].find(f => f.startsWith(PUB) && fs.existsSync(f) && fs.statSync(f).isFile());
-  if (!file) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
+  if (!file) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }); return fs.createReadStream(path.join(PUB, '404.html')).pipe(res); }
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
   fs.createReadStream(file).pipe(res);
 });
