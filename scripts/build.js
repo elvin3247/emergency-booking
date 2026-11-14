@@ -22,7 +22,7 @@ const HEAD = `<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#E9EDF1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">`;
 
 // Services and trades that are switched on in config.js.
@@ -94,8 +94,9 @@ function bookBar(o) {
   const first = o.service || LIVE[0];
   const chips = SERVICES.map(k => {
     const s = C.services[k];
+    if (o.liveOnly && !s.live) return '';
     return '<label class="chip" for="b-s-' + k + '"><input type="radio" id="b-s-' + k + '" name="s" value="' + k + '"' + (s.live ? (k === first ? ' checked' : '') : ' disabled') + '><span>' + esc(s.name) + (s.live ? '' : '<em>Soon</em>') + '</span></label>';
-  }).join('\n          ');
+  }).filter(Boolean).join('\n          ');
   const groups = LIVE.map(k => '<optgroup label="' + esc(C.services[k].name) + '">' + problemsOf(k).map(p => '<option value="' + p + '"' + (p === o.problem && k === first ? ' selected' : '') + '>' + esc(C.problems[p][0]) + '</option>').join('') + '</optgroup>').join('');
   return `<form class="book" id="book" action="/request" method="get" novalidate${o.county ? ' data-county="' + esc(o.county) + '"' : ''}${o.service ? ' data-service="' + o.service + '"' : ''}${o.problem ? ' data-problem' : ''}>
         <fieldset class="svc"><legend>What kind of help do you need?</legend>
@@ -112,11 +113,65 @@ function bookBar(o) {
       </form>`;
 }
 
-// The service cards on the home page.
-const serviceGrid = () => SERVICES.map(k => {
-  const s = C.services[k], body = icon(k) + '<span><b>' + esc(s.name) + (s.live ? '' : '<span class="pill plain">Coming soon</span>') + '</b><span>' + esc(s.blurb) + '</span></span>';
-  return s.live ? '<a class="svccard t-' + k + '" href="/request?s=' + k + '">' + body + '</a>' : '<div class="svccard off t-' + k + '">' + body + '</div>';
-}).join('\n        ');
+// "Where in the house?" on the home page: a cutaway drawing with a pin for each problem, plus the same problems as a plain list (what search engines read).
+// PINS: problem -> [x, y of the thing in the drawing, x, y of the pin]. A problem with no pin still shows in the list.
+const PINS = {
+  leak: [376, 117, 410, 124], toilet: [135, 214, 166, 190], 'burst-pipe': [262, 262, 300, 236], thermostat: [402, 317, 436, 298], clog: [184, 334, 216, 306],
+  'no-heat': [110, 430, 58, 430], noise: [204, 396, 226, 424], 'no-hot-water': [306, 420, 338, 400], 'wh-leak': [320, 494, 356, 470], sump: [420, 456, 420, 420], 'no-cooling': [547, 336, 547, 306]
+};
+const HOUSE_ART = `<rect x="0" y="380" width="600" height="140" fill="url(#soil)" class="soil"/><line x1="0" y1="380" x2="600" y2="380" class="ground"/>
+<rect x="392" y="52" width="26" height="60" class="chim"/><polygon points="66,150 280,34 494,150" class="roof"/><circle cx="160" cy="128" r="10" class="win"/>
+<rect x="90" y="150" width="380" height="350" class="shell"/><line x1="90" y1="270" x2="470" y2="270" class="floor"/><line x1="90" y1="380" x2="470" y2="380" class="floor"/>
+<line x1="250" y1="150" x2="250" y2="380" class="wall"/>
+<rect x="300" y="100" width="76" height="34" rx="3" class="eq hv"/><line x1="300" y1="117" x2="200" y2="117" class="duct"/><line x1="200" y1="117" x2="200" y2="150" class="duct"/><path d="M332 136 q-3 6 0 9 q3 -3 0 -9z" class="drop"/>
+<rect x="112" y="226" width="30" height="34" rx="4" class="fx"/><rect x="108" y="214" width="38" height="14" rx="3" class="fx"/><rect x="176" y="236" width="62" height="24" rx="10" class="fx"/>
+<rect x="350" y="232" width="96" height="28" rx="4" class="fx soft"/><rect x="350" y="220" width="22" height="14" rx="3" class="fx soft"/>
+<line x1="262" y1="500" x2="262" y2="190" class="pipe"/><line x1="262" y1="190" x2="230" y2="190" class="pipe"/><path d="M262 262 l-12 -8 M262 262 l-14 2 M262 262 l-10 10 M262 262 l12 -8 M262 262 l14 2" class="spray"/><ellipse cx="300" cy="273" rx="26" ry="4" class="stain"/>
+<rect x="104" y="338" width="132" height="42" class="fx soft"/><rect x="146" y="332" width="44" height="8" rx="2" class="fx"/><path d="M168 324 v-14 h10" class="pipe thin"/>
+<rect x="386" y="306" width="16" height="22" rx="3" class="fx hv"/><rect x="300" y="350" width="120" height="30" rx="8" class="fx soft"/>
+<rect x="110" y="404" width="64" height="86" rx="4" class="eq hv"/><rect x="122" y="452" width="40" height="18" rx="2" class="flame"/><path d="M186 396 q6 -6 12 0 q6 6 12 0" class="noise"/>
+<rect x="262" y="408" width="48" height="84" rx="20" class="eq wh"/><ellipse cx="300" cy="494" rx="34" ry="5" class="puddle"/>
+<rect x="392" y="456" width="56" height="44" class="pit"/><rect x="408" y="462" width="24" height="26" rx="3" class="eq pl"/>
+<rect x="508" y="336" width="78" height="44" rx="4" class="eq cl"/><circle cx="547" cy="358" r="14" class="fan"/>`;
+const houseSection = () => {
+  const probHref = p => '/request?s=' + C.problems[p][2][0] + '&amp;p=' + p;
+  // Groups: heating and cooling share one list; every other live service gets its own.
+  const groups = [];
+  SERVICES.filter(k => C.services[k].live).forEach(k => {
+    const t = C.services[k].trade;
+    const name = t === 'hvac' ? 'Heating and cooling' : C.services[k].name;
+    let g = groups.find(x => x.name === name);
+    if (!g) groups.push(g = { name, k, hub: '/' + t, hubText: t === 'hvac' ? 'HVAC pros by county' : k === 'plumbing' ? 'Plumbers by county' : C.services[k].name + ' pros by county', probs: [] });
+    Object.keys(C.problems).forEach(p => { if (p !== 'other' && C.problems[p][2][0] === k && !g.probs.includes(p)) g.probs.push(p); });
+  });
+  const order = Object.keys(C.problems);
+  groups.forEach(g => g.probs.sort((a, z) => order.indexOf(a) - order.indexOf(z)));
+  const rows = groups.map(g => '<div class="hg t-' + g.k + '"><h3>' + esc(g.name) + '</h3><ul>' +
+    g.probs.map(p => '<li><a href="' + probHref(p) + '" data-k="' + p + '"><b>' + esc(C.problems[p][0]) + '</b><span>' + esc(C.problems[p][1]) + '</span></a></li>').join('') +
+    '</ul><a class="hub" href="' + g.hub + '">' + esc(g.hubText) + '</a></div>').join('\n          ');
+  const pins = groups.flatMap(g => g.probs).filter(p => PINS[p]).map(p => {
+    const [ox, oy, x, y] = PINS[p];
+    return '<a href="' + probHref(p) + '" class="pin t-' + C.problems[p][2][0] + '" data-k="' + p + '" data-x="' + x + '" data-y="' + y + '" aria-label="' + esc(C.problems[p][0]) + '"><line x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" class="lead"/><circle cx="' + ox + '" cy="' + oy + '" r="3" class="anchor"/><circle cx="' + x + '" cy="' + y + '" r="11" class="ring"/><circle cx="' + x + '" cy="' + y + '" r="4" class="dot"/></a>';
+  }).join('');
+  const soon = SERVICES.filter(k => !C.services[k].live).map(k => C.services[k].name.toLowerCase());
+  return `<div class="hx">
+        <div class="hx-text">
+          <h2>Where in the house?</h2>
+          <p class="sub">Point to the trouble. Every spot is a problem our pros fix, and each one opens a request with it filled in.</p>
+          <div class="hlist">
+          ${rows}
+          </div>
+          ${soon.length ? '<p class="soon">' + esc(list(soon).replace(/^./, c => c.toUpperCase())) + ' ' + (soon.length > 1 ? 'are' : 'is') + ' coming soon. Not sure it needs a visit? Try our <a href="/help">quick checks</a> first.</p>' : '<p class="soon">Not sure it needs a visit? Try our <a href="/help">quick checks</a> first.</p>'}
+        </div>
+        <div class="hx-art">
+          <svg class="house" viewBox="0 0 600 520" role="img" aria-labelledby="hs-t"><title id="hs-t">Cutaway of a house showing where each problem happens</title><defs><pattern id="soil" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" class="hatch"/></pattern></defs>
+${HOUSE_ART}
+${pins}</svg>
+          <p class="flag" id="hx-flag" aria-hidden="true"></p>
+          <p class="tip">Hover or tap a spot to see the problem.</p>
+        </div>
+      </div>`;
+};
 
 const problemRows = (trade, county) => servicesOf(trade).filter(k => C.services[k].live).map(k => problemsOf(k).filter(p => p !== 'other' && C.problems[p][2][0] === k).map(p => {
   const P = C.problems[p], q = '/request?s=' + k + '&amp;p=' + p + (county ? '&amp;county=' + encodeURIComponent(county) : '');
@@ -129,6 +184,16 @@ const HOW = `<ol class="how">
         <li><span class="n">2</span><b>Nearby pros say yes</b><span>Each one who's free sends an arrival time and visit fee.</span></li>
         <li><span class="n">3</span><b>You choose one</b><span>Compare up to ${C.maxOffers}. Only the one you pick gets your name, number, and address.</span></li>
       </ol>`;
+// The home page version of "How it works": three steps, each with a small picture. Companies are made up.
+const STORY = `<ol class="story">
+        <li><div class="pic" aria-hidden="true"><div class="mini-tk"><div class="mt-row"><small>What's wrong</small>No heat</div><div class="mt-row"><small>ZIP code</small>07059</div></div></div>
+          <span class="n">1</span><h3>Tell us what broke</h3><p>Pick the problem and your ZIP. It takes about a minute, and you don't sign up.</p></li>
+        <li><div class="pic" aria-hidden="true"><div class="mini-of"><span class="t">45 min</span><span><b>Example Plumbing Co.</b><small>$95 visit, license on file</small></span></div><div class="mini-of"><span class="t">90 min</span><span><b>Sample Pipe and Drain</b><small>$79 visit, license on file</small></span></div></div>
+          <span class="n">2</span><h3>Free pros say yes</h3><p>Licensed pros in your county who can come send an arrival time and a visit fee. Up to ${C.maxOffers} offers.</p></li>
+        <li><div class="pic" aria-hidden="true"><div class="mini-of picked"><span class="t">45 min</span><span><b>Example Plumbing Co.</b><small>Calling you now</small></span><em class="mini-stamp">Booked</em></div></div>
+          <span class="n">3</span><h3>You choose one</h3><p>Only the pro you pick gets your name, number, and address. They call to confirm.</p></li>
+      </ol>`;
+const PRO_TERMS = () => '<ul class="terms">' + (C.freeLaunch ? '<li>Free during our launch, no lead fees</li>' : '<li>First ' + C.freeLeads + ' chosen leads free, then $' + C.leadFee + ' only when a customer picks you</li>') + '<li>No monthly fee or contract</li><li>Only you get the customer\'s details</li></ul>';
 const LEGEND = '<div class="legend" id="legend" hidden><span><i class="dot now"></i>On call now</span><span><i class="dot later"></i>Signed up, off hours now</span><span><i class="dot"></i>Recruiting, you can still ask</span></div>';
 
 // ---- County pages for each trade that is switched on: /hvac/<county>-county-nj, /plumbing/<county>-county-nj ----
@@ -302,10 +367,11 @@ Object.keys(PAGES).forEach(file => {
   let html = fs.readFileSync(f, 'utf8').replace(/(<span data-brand>)[^<]*(<\/span>)/g, '$1' + esc(C.brand) + '$2');
   const m = PAGES[file];
   if (file === 'index.html') {
-    html = block(html, 'book', '      ' + bookBar());
-    html = block(html, 'services', '        ' + serviceGrid());
+    html = block(html, 'book', '      ' + bookBar({ liveOnly: true }));
+    html = block(html, 'services', '      ' + houseSection());
     html = block(html, 'counties', '        ' + countyGrid(LIVE_TRADES[0], true));
-    html = block(html, 'how', '      ' + HOW);
+    html = block(html, 'how', '      ' + STORY);
+    html = block(html, 'proterms', '        ' + PRO_TERMS());
     const soon = SERVICES.filter(k => !C.services[k].live).map(k => C.services[k].name.toLowerCase());
     const up = t => t.charAt(0).toUpperCase() + t.slice(1);
     html = html.replace(/(<span id="hero-services">)[^<]*/, '$1' + esc(up(LIVE_NAMES)) + ' repair.');
