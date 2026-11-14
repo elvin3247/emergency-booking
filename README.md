@@ -59,6 +59,7 @@ In this mode contractors are approved automatically, the links from each "email"
 
 - Edited HTML, CSS, or JS in `public/`? Just refresh the browser.
 - Edited `public/assets/config.js`, `scripts/content.js`, `scripts/triage.js`, or `scripts/build.js`? Run `npm run build`, then refresh.
+- Got a new `emergency-booking.zip`? Save it to Downloads and run `npm run update`. It copies the files in without touching `.git`.
 - Publish: `git add -A`, `git commit -m "what changed"`, `git push`. Vercel deploys `main` on every push. Push a different branch to get a private preview link first.
 
 ## Not built yet
@@ -80,6 +81,11 @@ how many counties have live pros. "Prove it works" sends a real test email, a te
 - **Register first.** US carriers block business texts from unregistered senders. In Twilio, register a 10DLC campaign (brand plus a "customer care / account notifications" use case) or verify a toll-free number. They'll ask for: your opt-in wording (it's `consent.sms` in `public/assets/config.js`), sample messages (see `lib/emails.js`, the `text:` lines), and your privacy policy link. Approval can take days to a few weeks.
 - STOP and HELP replies are handled by Twilio's messaging service. If a text fails because the person replied STOP or the number isn't a mobile, the site turns texts off for that pro and shows why on their settings page.
 - Run `supabase/schema.sql` again to add the new columns.
+
+## Backups
+
+Every Monday the daily job emails you two spreadsheet files: your contractors and your recruiting list. "Download a backup" on the admin page gets the same files anytime.
+Private settings links and invite codes are left out, so a forwarded backup can't be used to change anyone's settings. Requests are not included; they stay in Supabase.
 
 ## Recruiting (admin page)
 

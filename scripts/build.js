@@ -118,8 +118,11 @@ function bookBar(o) {
 // "Where in the house?" on the home page: a cutaway drawing with a pin for each problem, plus the same problems as a plain list (what search engines read).
 // PINS: problem -> [x, y of the thing in the drawing, x, y of the pin]. A problem with no pin still shows in the list.
 const PINS = {
-  leak: [376, 117, 410, 124], toilet: [135, 214, 166, 190], 'burst-pipe': [262, 262, 300, 236], thermostat: [402, 317, 436, 298], clog: [184, 334, 216, 306],
-  'no-heat': [110, 430, 58, 430], noise: [204, 396, 226, 424], 'no-hot-water': [306, 420, 338, 400], 'wh-leak': [320, 494, 356, 470], sump: [420, 456, 420, 420], 'no-cooling': [547, 336, 547, 306]
+  leak: [376, 117, 410, 124], toilet: [135, 214, 166, 190], 'burst-pipe': [262, 262, 300, 236], thermostat: [402, 317, 436, 298], clog: [184, 334, 198, 302],
+  'no-heat': [110, 430, 58, 430], noise: [204, 396, 238, 402], 'no-hot-water': [306, 420, 338, 400], 'wh-leak': [320, 494, 356, 470], sump: [420, 456, 420, 420], 'no-cooling': [547, 336, 547, 306],
+  // Electrical and appliances: drawn now, pinned once those services are switched on.
+  breaker: [296, 306, 320, 298], 'power-out': [370, 290, 354, 318], outlet: [322, 251, 336, 216],
+  fridge: [96, 336, 58, 336], kitchen: [214, 360, 234, 322], laundry: [215, 458, 215, 427]
 };
 const HOUSE_ART = `<rect x="0" y="380" width="600" height="140" fill="url(#soil)" class="soil"/><line x1="0" y1="380" x2="600" y2="380" class="ground"/>
 <rect x="392" y="52" width="26" height="60" class="chim"/><polygon points="66,150 280,34 494,150" class="roof"/><circle cx="160" cy="128" r="10" class="win"/>
@@ -129,9 +132,15 @@ const HOUSE_ART = `<rect x="0" y="380" width="600" height="140" fill="url(#soil)
 <rect x="112" y="226" width="30" height="34" rx="4" class="fx"/><rect x="108" y="214" width="38" height="14" rx="3" class="fx"/><rect x="176" y="236" width="62" height="24" rx="10" class="fx"/>
 <rect x="350" y="232" width="96" height="28" rx="4" class="fx soft"/><rect x="350" y="220" width="22" height="14" rx="3" class="fx soft"/>
 <line x1="262" y1="500" x2="262" y2="190" class="pipe"/><line x1="262" y1="190" x2="230" y2="190" class="pipe"/><path d="M262 262 l-12 -8 M262 262 l-14 2 M262 262 l-10 10 M262 262 l12 -8 M262 262 l14 2" class="spray"/><ellipse cx="300" cy="273" rx="26" ry="4" class="stain"/>
-<rect x="104" y="338" width="132" height="42" class="fx soft"/><rect x="146" y="332" width="44" height="8" rx="2" class="fx"/><path d="M168 324 v-14 h10" class="pipe thin"/>
+<rect x="134" y="338" width="102" height="42" class="fx soft"/><rect x="146" y="332" width="44" height="8" rx="2" class="fx"/><path d="M168 324 v-14 h10" class="pipe thin"/>
+<rect x="96" y="292" width="34" height="88" rx="3" class="eq ap"/><line x1="96" y1="322" x2="130" y2="322" class="wall"/><line x1="124" y1="300" x2="124" y2="314" class="wall"/>
+<rect x="198" y="346" width="32" height="28" rx="2" class="fx"/><line x1="203" y1="352" x2="225" y2="352" class="wall"/>
+<rect x="272" y="290" width="24" height="34" rx="2" class="eq el"/><line x1="278" y1="298" x2="290" y2="298" class="wall"/><line x1="278" y1="306" x2="290" y2="306" class="wall"/><line x1="278" y1="314" x2="290" y2="314" class="wall"/>
+<line x1="370" y1="272" x2="370" y2="282" class="wall"/><circle cx="370" cy="288" r="6" class="bulb"/>
+<rect x="317" y="244" width="10" height="14" rx="2" class="fx"/>
 <rect x="386" y="306" width="16" height="22" rx="3" class="fx hv"/><rect x="300" y="350" width="120" height="30" rx="8" class="fx soft"/>
 <rect x="110" y="404" width="64" height="86" rx="4" class="eq hv"/><rect x="122" y="452" width="40" height="18" rx="2" class="flame"/><path d="M186 396 q6 -6 12 0 q6 6 12 0" class="noise"/>
+<rect x="192" y="444" width="46" height="46" rx="3" class="eq ap"/><circle cx="215" cy="468" r="12" class="fan"/>
 <rect x="262" y="408" width="48" height="84" rx="20" class="eq wh"/><ellipse cx="300" cy="494" rx="34" ry="5" class="puddle"/>
 <rect x="392" y="456" width="56" height="44" class="pit"/><rect x="408" y="462" width="24" height="26" rx="3" class="eq pl"/>
 <rect x="508" y="336" width="78" height="44" rx="4" class="eq cl"/><circle cx="547" cy="358" r="14" class="fan"/>`;
@@ -580,5 +589,23 @@ write('assets/nj-zips.js', '// New Jersey ZIP codes: [county index in SITE.count
 write('robots.txt', 'User-agent: *\nDisallow: /api/\nDisallow: /status\nDisallow: /respond\nDisallow: /pro\nDisallow: /admin\nDisallow: /unsubscribe\n' + (base ? 'Sitemap: ' + abs('/sitemap.xml') + '\n' : ''));
 if (base) write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + sitemap.sort().map(p => '  <url><loc>' + abs(p) + '</loc></url>').join('\n') + '\n</urlset>\n');
 else if (fs.existsSync(path.join(PUB, 'sitemap.xml'))) fs.unlinkSync(path.join(PUB, 'sitemap.xml'));
+
+// Cache busting: stamp each page's links to the shared styles and scripts with a short fingerprint of the file,
+// like /assets/styles.css?v=3f9a1c2b. Browsers may keep these files for a while (see vercel.json), so a changed file
+// must get a new address or visitors would see old styles. Runs on every build, so just run npm run build before pushing.
+(function () {
+  const crypto = require('crypto');
+  const names = ['styles.css', 'site.js', 'config.js', 'nj-zips.js'];
+  const v = Object.fromEntries(names.map(n => [n, crypto.createHash('sha1').update(fs.readFileSync(path.join(PUB, 'assets', n))).digest('hex').slice(0, 8)]));
+  const re = new RegExp('"/assets/(' + names.map(n => n.replace('.', '\\.')).join('|') + ')(\\?v=[0-9a-f]*)?"', 'g');
+  const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).forEach(e => {
+    const f = path.join(dir, e.name);
+    if (e.isDirectory()) return walk(f);
+    if (!e.name.endsWith('.html')) return;
+    const html = fs.readFileSync(f, 'utf8'), out = html.replace(re, (m, n) => '"/assets/' + n + '?v=' + v[n] + '"');
+    if (out !== html) fs.writeFileSync(f, out);
+  });
+  walk(PUB);
+})();
 
 console.log('Built ' + sitemap.length + ' indexable pages for "' + C.brand + '"' + (base ? ' at ' + base : ' (no siteUrl set, so no sitemap or canonical links yet)') + '.');

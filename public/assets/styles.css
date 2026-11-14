@@ -102,7 +102,9 @@ textarea{min-height:72px;resize:vertical}
 .tile.svc{flex-direction:row;align-items:center;gap:12px}
 .tile.svc>span:last-child{display:flex;flex-direction:column;color:inherit;font-size:inherit}
 .tile.svc>span:last-child span{color:var(--muted);font-size:.9rem}
-.tile.off{cursor:default;border-style:dashed;border-color:var(--line-strong);opacity:.75}
+.tile.off{cursor:default;border-style:dashed;border-color:var(--line-strong)}
+.tile.off .ico{filter:grayscale(1);opacity:.55}
+.tile.off b{color:var(--muted)}
 .tile.off:hover{border-color:var(--line-strong)}
 .tile.danger{border-color:var(--crit);background:var(--crit-soft)}
 .steps{display:flex;gap:6px;list-style:none;padding:0;margin:0;font-size:.8rem;font-weight:700;color:var(--muted)}
@@ -416,7 +418,7 @@ body.home .hero .wrap{padding-block:120px 72px}
 .house .win{fill:var(--surface);stroke:var(--ink);stroke-width:2}
 .house .floor{stroke:var(--ink);stroke-width:4}.house .wall{stroke:var(--ink);stroke-width:2}
 .house .fx{fill:var(--surface);stroke:var(--ink);stroke-width:1.6}.house .fx.soft{fill:var(--line)}
-.house .eq{stroke:var(--ink);stroke-width:1.8}.house .hv{fill:#FFE1CC}.house .cl{fill:#DCE7FF}.house .wh{fill:#F9DDEA}.house .pl{fill:#D4EFEC}
+.house .eq{stroke:var(--ink);stroke-width:1.8}.house .ap{fill:#E6E0F7}.house .el{fill:#E4E6EA}.house .bulb{fill:#FFE58F;stroke:var(--ink);stroke-width:1.5}.house .hv{fill:#FFE1CC}.house .cl{fill:#DCE7FF}.house .wh{fill:#F9DDEA}.house .pl{fill:#D4EFEC}
 .house .flame{fill:#C2500B;opacity:.8}.house .fan{fill:none;stroke:var(--ink);stroke-width:1.5}
 .house .duct{stroke:var(--ink);stroke-width:8;stroke-linecap:square;opacity:.18}
 .house .pipe{stroke:#0B6B6B;stroke-width:5;fill:none;stroke-linecap:round}.house .pipe.thin{stroke-width:3}
@@ -514,3 +516,29 @@ body.home .hero .wrap{padding-block:120px 72px}
 /* Home hero fills the first screen, with its content centered top to bottom. svh keeps phones from jumping when the address bar hides. */
 body.home .hero{min-height:100vh;min-height:100svh;display:flex;align-items:center}
 body.home .hero>.wrap{width:100%}
+
+/* Big screens: the page gets wider (up to 1400px) instead of leaving wide empty margins. */
+@media (min-width:1300px){.wrap{max-width:min(1400px,86vw)}}
+/* Dark mode: the ZIP box needs the same fill as the problem box. */
+@media (prefers-color-scheme: dark){.herocard .book .bar>div.z{background:#26262E}}
+/* Home hero scales with the screen on laptops and up. Sizes come from the hero's own width (cqi), so the headline
+   always stays on three lines and the booking card grows in step with it. */
+@media (min-width:1000px){
+  .herocard{container-type:inline-size;gap:clamp(48px,5vw,96px);grid-template-columns:1.15fr .85fr}
+  .herocard h1{font-size:clamp(3.6rem,6.4cqi,5.6rem);line-height:1.02}
+  .herocard .copy{gap:clamp(18px,1.6cqi,28px)}
+  .herocard .lede{font-size:clamp(1.15rem,1.55cqi,1.5rem);max-width:30em}
+  .ticks{font-size:clamp(1rem,1.25cqi,1.25rem);gap:.6em}
+  .herocard .book{font-size:clamp(1rem,1.3cqi,1.2rem);padding:clamp(26px,2.4cqi,40px);gap:1em;border-radius:clamp(28px,2.4cqi,36px)}
+  .herocard .book .chip span{font-size:.9em;padding:.5em 1em;white-space:nowrap}
+  .herocard .book .bar{gap:.75em}
+  .herocard .book .bar>div{padding:.6em 1em;border-radius:16px}
+  .herocard .book .bar label{font-size:.78em}
+  .herocard .book .bar select,.herocard .book .bar input[type=text]{font-size:1.1em}
+  .herocard .book .btn{font-size:1.1em;padding:.9em 1.4em}
+  .herocard .book .foot{font-size:.8em}
+}
+/* Wide enough for the four services on one row. */
+@media (min-width:1200px){.herocard .book .svc{flex-wrap:nowrap}}
+/* Small laptops and tablets sideways: a touch smaller so the headline keeps its three lines next to the card. */
+@media (min-width:1000px) and (max-width:1199px){.herocard h1{font-size:5.6cqi}}

@@ -503,6 +503,19 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     // Launch checklist runs in the local preview
     const setup = (await (await fetch('http://localhost:3999/api/admin?view=setup', { headers: { 'x-admin-key': 'test-admin-key' } })).json());
     assert.ok(setup.checks.length > 8 && setup.checks.every(c => ['ok', 'warn', 'bad'].includes(c.state)), 'launch checklist returns every check');
+
+    // Backups: spreadsheet-safe, no private links, and emailed with attachments
+    const backup = require('../lib/backup');
+    assert.strictEqual(backup.cell('=HYPERLINK("x")'), '"\'=HYPERLINK(""x"")"', 'formulas are neutralized and quotes escaped');
+    assert.strictEqual(backup.cell(['Morris', 'Union']), 'Morris; Union');
+    assert.strictEqual(backup.isBackupDay(new Date('2026-11-16T15:00:00Z')), true, 'Monday in New Jersey');
+    assert.strictEqual(backup.isBackupDay(new Date('2026-11-17T03:00:00Z')), true, 'still Monday night in New Jersey');
+    const bk = (await adm({ action: 'backup' })).data;
+    assert.ok(bk.files.length === 2 && /^created_at,company,contact,email/.test(bk.files[0].csv) && /c77@example\.com/.test(bk.files[0].csv), 'contractor backup has the list');
+    assert.ok(!bk.files.some(f => f.csv.includes(T2.contractors[0].manage_token) || f.csv.includes(T2.prospects[0].token)), 'backups leave out private links');
+    await adm({ action: 'backup', email: true });
+    const bkMail = mail.outbox.filter(m => /weekly backup/.test(m.subject)).pop();
+    assert.ok(bkMail && bkMail.attachments.length === 2 && Buffer.from(bkMail.attachments[0].content, 'base64').toString().startsWith('created_at,'), 'backup email carries both files');
     const Sp = (await call('/api/requests', hReq({ problem: 'clog', email: 'spam@example.com', phone: '908-555-0666' }))).data.token;
     await adm({ action: 'cancel_request', id: reqRow(Sp).id });
     assert.strictEqual((await call('/api/requests?token=' + Sp)).data.state, 'canceled', 'admin can remove a spam request');

@@ -2,11 +2,16 @@
   "name": "emergency-booking",
   "private": true,
   "version": "0.1.0",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "node scripts/build.js",
     "dev": "node dev-server.js",
-    "test": "node test/flow.test.js"
+    "test": "node test/flow.test.js",
+    "update": "bash scripts/update.sh"
   },
-  "dependencies": { "@supabase/supabase-js": "^2.45.0" }
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
 }

@@ -5,7 +5,7 @@ module.exports = {
   areas: [
     { key: 'basement', name: 'Basement and utility room', intro: 'Where the furnace or boiler, the water heater, the sump pump, and the main water valve usually live.' },
     { key: 'kitchen-bath', name: 'Kitchen and bathrooms', intro: 'Sinks, tubs, and toilets. Most problems here start at one fixture, so check whether other drains are affected.' },
-    { key: 'walls', name: 'Walls, ceilings, and thermostat', intro: 'Pipes run inside walls and ceilings, and the thermostat runs the whole heating and cooling system.' },
+    { key: 'walls', name: 'Walls, ceilings, and thermostat', intro: 'Pipes run inside walls and ceilings. Outlets, switches, lights, the breaker panel, and the thermostat live here too.' },
     { key: 'attic-outside', name: 'Attic and outside', intro: 'Many homes have the air handler in the attic and the AC or heat pump unit outside.' }
   ],
   problems: {
@@ -74,6 +74,43 @@ module.exports = {
       now: ['It is a heat wave and babies, older adults, or anyone with a health condition is in the house.', 'You smell burning or the outdoor unit is buzzing loudly but not running: turn it off.'],
       wait: 'On a mild day, no cooling can usually wait for a daytime visit.',
       first: ['Set the thermostat to Cool and a few degrees below room temperature.', 'Check the breakers for the AC and the indoor unit, and replace a dirty filter.', 'If the outdoor unit is iced over, turn the system off and let it thaw.']
+    },
+    // Electrical and appliances: these show on /whats-wrong once those services are switched on in config.js.
+    'power-out': {
+      area: 'walls',
+      now: ['You see sparks, smoke, or scorch marks, or smell burning plastic: leave and call 911.', 'Lights flicker or dim across the house.', 'Part of the house has no power in freezing weather. Most heating needs power to run.'],
+      wait: 'One dead room or outlet, with no smell or heat, can usually wait for a daytime visit.',
+      first: ['Check the breaker panel for a tripped breaker and reset it once.', 'Press Test, then Reset, on outlets with buttons in the kitchen, bathrooms, garage, and outside.', 'Ask a neighbor or check your utility to rule out an outage.']
+    },
+    breaker: {
+      area: 'walls',
+      now: ['It trips again right away, even with things unplugged.', 'The panel feels hot, buzzes, or shows scorch marks. Do not touch it.'],
+      wait: 'If it only trips when one appliance runs, unplug that appliance and it can usually wait.',
+      first: ['Unplug what is on that circuit, then reset the breaker once.', 'Do not keep resetting a breaker that trips again. It is protecting the wiring.']
+    },
+    outlet: {
+      area: 'walls',
+      now: ['The outlet or switch is warm, buzzing, sparking, or scorched.'],
+      wait: 'A dead outlet with no heat or smell can usually wait.',
+      first: ['Stop using it and unplug anything plugged in.', 'If it is warm or buzzing, switch off its breaker.']
+    },
+    fridge: {
+      area: 'kitchen-bath',
+      now: ['You have medicine, like insulin, that must stay cold.', 'Water is leaking toward outlets or under the floor.'],
+      wait: 'A closed fridge keeps food cold for about 4 hours, and a full freezer for about 2 days, so a same-day visit is usually fine.',
+      first: ['Keep the doors closed.', 'Check that it is plugged in, its breaker is on, and the temperature dial was not bumped.', 'Clear anything blocking the vents inside.']
+    },
+    kitchen: {
+      area: 'kitchen-bath',
+      now: ['You smell gas near the stove: leave and call 911 or your gas utility from outside.', 'A burner or the oven will not turn off.'],
+      wait: 'An oven, stove, or dishwasher that will not start can usually wait for a daytime visit.',
+      first: ['Turn it off and unplug it, or switch off its breaker.', 'If the dishwasher is leaking, turn off the valve under the sink.']
+    },
+    laundry: {
+      area: 'basement',
+      now: ['You smell burning from the dryer: turn it off and unplug it. If there is smoke, leave and call 911.', 'The washer is leaking and water is spreading.'],
+      wait: 'A washer or dryer that will not start can usually wait for a daytime visit.',
+      first: ['If the washer leaks, turn off the two water valves behind it.', 'Clean the dryer lint screen and check that the vent hose is not crushed.', 'Check the breaker, and that the door is fully closed.']
     }
   }
 };

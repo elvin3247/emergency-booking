@@ -13,6 +13,7 @@ const { daily } = require('../lib/daily');
 const recruit = require('../lib/recruit');
 const setup = require('../lib/setup');
 const sms = require('../lib/sms');
+const backup = require('../lib/backup');
 const isId = v => /^[0-9a-f-]{36}$/i.test(String(v || ''));
 const isCron = headers => {
   const want = process.env.CRON_SECRET ? Buffer.from('Bearer ' + process.env.CRON_SECRET) : null, got = Buffer.from(String(headers.authorization || ''));
@@ -100,6 +101,12 @@ module.exports = wrap({
     if (body.action === 'prospects_invite') return recruit.invite(body.ids, body.note);
     if (body.action === 'prospect_update') return recruit.update(body.id, body);
     // Launch checklist: prove email and texts really arrive.
+    // Backup: download both lists now, or have them emailed.
+    if (body.action === 'backup') {
+      const b = await backup.build();
+      if (body.email) { const r = await mail.send(E.adminBackup(b)); if (!r.ok) throw bad(r.error || 'The backup email did not send.', 502); return { ok: true, emailed: true, counts: b.counts }; }
+      return b;
+    }
     if (body.action === 'test_email') {
       const to = str(body.to, 120).toLowerCase() || C.ADMIN_EMAIL;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw bad('Enter the email address to send the test to.');
