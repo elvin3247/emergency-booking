@@ -65,7 +65,13 @@
     '<nav class="nav" aria-label="Main"><a class="hide-sm" href="/#services">Services</a><a class="hide-sm" href="/#how">How it works</a><a class="hide-sm" href="/help">Quick checks</a><a class="hide-sm" href="/contractors">For pros</a>' +
     '<button class="menu-btn" type="button" aria-expanded="false" aria-controls="menu">Menu</button><a class="btn sm" href="/request">Get help now</a></nav></div>' +
     // Phone menu: the links that don't fit in the header on small screens.
-    '<div class="menu" id="menu" hidden><div class="wrap"><a href="/#services">Services</a><a href="/#how">How it works</a><a href="/help">Quick checks</a><a href="/find">Find my request</a><a href="/contractors">For pros</a></div></div></header>';
+    '<div class="menu" id="menu" hidden><div class="wrap"><a class="btn menu-cta" href="/request">Get help now</a><a href="/#services">Services</a><a href="/#how">How it works</a><a href="/help">Quick checks</a><a href="/find">Find my request</a><a href="/contractors">For pros</a></div></div></header>';
+  // Phones: show the bottom "Get help now" button only after the booking form scrolls out of view.
+  var bookEl = byId('book');
+  if (bookEl && 'IntersectionObserver' in window) {
+    document.body.classList.add('has-book');
+    new IntersectionObserver(function (es) { document.body.classList.toggle('past-book', !es[0].isIntersecting && es[0].boundingClientRect.top < 0); }).observe(bookEl);
+  }
   var mb = document.querySelector('.menu-btn');
   if (mb) mb.addEventListener('click', function () { var m = byId('menu'), open = m.hidden; m.hidden = !open; mb.setAttribute('aria-expanded', String(open)); mb.textContent = open ? 'Close' : 'Menu'; });
   var ftr = byId('site-footer');
@@ -171,3 +177,25 @@ window.uploadPhotos = async function (token, files, max) {
   return { sent: sent, error: errors[0] || '' };
 };
 window.photoGrid = function (urls) { return urls && urls.length ? '<div class="photos">' + urls.map(function (u, i) { return '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="Photo ' + (i + 1) + ' from the homeowner" loading="lazy"></a>'; }).join('') + '</div>' : ''; };
+
+// Home: "Where in the house?" Hovering or focusing a pin or a problem lights up both, with a label over the pin.
+(function () {
+  var svg = document.querySelector('.house'), flag = document.getElementById('hx-flag');
+  if (!svg || !flag) return;
+  function on(k, v) {
+    document.querySelectorAll('#services [data-k="' + k + '"]').forEach(function (e) { e.classList.toggle('on', v); });
+    var pin = svg.querySelector('.pin[data-k="' + k + '"]'), name = document.querySelector('.hlist [data-k="' + k + '"] b');
+    if (v && pin && name) {
+      var r = svg.getBoundingClientRect(), pr = svg.parentNode.getBoundingClientRect(), sc = r.width / 600;
+      flag.textContent = name.textContent;
+      flag.style.left = (r.left - pr.left + pin.getAttribute('data-x') * sc) + 'px';
+      flag.style.top = (r.top - pr.top + pin.getAttribute('data-y') * sc) + 'px';
+      flag.classList.add('show');
+    } else flag.classList.remove('show');
+  }
+  document.querySelectorAll('#services [data-k]').forEach(function (e) {
+    var k = e.getAttribute('data-k');
+    ['mouseenter', 'focus'].forEach(function (ev) { e.addEventListener(ev, function () { on(k, true); }); });
+    ['mouseleave', 'blur'].forEach(function (ev) { e.addEventListener(ev, function () { on(k, false); }); });
+  });
+})();

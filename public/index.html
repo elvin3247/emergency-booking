@@ -20,7 +20,7 @@
 <meta name="theme-color" content="#E9EDF1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/assets/styles.css">
 <!-- head:end -->
 </head>
@@ -40,8 +40,15 @@
     </svg>
     <div class="wrap">
       <div class="herocard">
-        <h1>Home emergency? Find a pro near you who can come now.</h1>
-        <p class="lede"><span id="hero-services">Heating, cooling, plumbing, and water heater repair.</span> Licensed local pros reply with an arrival time and visit fee. You pick.</p>
+        <div class="copy">
+          <h1>Home emergency? Find a pro near you who can come now.</h1>
+          <p class="lede">Licensed local pros reply with an arrival time and a price. You pick who comes.</p>
+          <ul class="ticks">
+            <li>Free for homeowners, open 24/7</li>
+            <li>Every pro's license checked</li>
+            <li>Your number goes only to the pro you choose</li>
+          </ul>
+        </div>
 <!-- book:start -->
       <form class="book" id="book" action="/request" method="get" novalidate>
         <fieldset class="svc"><legend>What kind of help do you need?</legend>
@@ -49,8 +56,6 @@
           <label class="chip" for="b-s-cooling"><input type="radio" id="b-s-cooling" name="s" value="cooling"><span>Cooling</span></label>
           <label class="chip" for="b-s-plumbing"><input type="radio" id="b-s-plumbing" name="s" value="plumbing"><span>Plumbing</span></label>
           <label class="chip" for="b-s-water-heater"><input type="radio" id="b-s-water-heater" name="s" value="water-heater"><span>Water heater</span></label>
-          <label class="chip" for="b-s-electrical"><input type="radio" id="b-s-electrical" name="s" value="electrical" disabled><span>Electrical<em>Soon</em></span></label>
-          <label class="chip" for="b-s-appliances"><input type="radio" id="b-s-appliances" name="s" value="appliances" disabled><span>Appliances<em>Soon</em></span></label>
         </fieldset>
         <div class="bar">
           <div><label for="b-problem">What's wrong</label><select id="b-problem" name="p"><optgroup label="Heating"><option value="no-heat">No heat</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></optgroup><optgroup label="Cooling"><option value="no-cooling">No cooling</option><option value="leak">Water leaking from unit</option><option value="noise">Loud noise or burning smell</option><option value="thermostat">Thermostat not working</option><option value="other">Something else</option></optgroup><optgroup label="Plumbing"><option value="burst-pipe">Burst or leaking pipe</option><option value="clog">Clogged drain or backup</option><option value="toilet">Toilet problem</option><option value="sump">Sump pump not working</option><option value="other">Something else</option></optgroup><optgroup label="Water heater"><option value="no-hot-water">No hot water</option><option value="wh-leak">Water heater leaking</option><option value="other">Something else</option></optgroup></select></div>
@@ -68,43 +73,58 @@
 
   <section class="sec" id="services">
     <div class="wrap">
-      <h2>Every urgent home repair, one place</h2>
-      <div class="svcgrid">
 <!-- services:start -->
-        <a class="svccard t-heating" href="/request?s=heating"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3 4 5 4 9a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-8z"/></svg></span><span><b>Heating</b><span>No heat, furnace, boiler, heat pump</span></span></a>
-        <a class="svccard t-cooling" href="/request?s=cooling"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M4.9 4.9l14.2 14.2M2 12h20M4.9 19.1L19.1 4.9"/></svg></span><span><b>Cooling</b><span>No AC, warm air, frozen or leaking unit</span></span></a>
-        <a class="svccard t-plumbing" href="/request?s=plumbing"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg></span><span><b>Plumbing</b><span>Burst pipe, clog, toilet, sump pump</span></span></a>
-        <a class="svccard t-water-heater" href="/request?s=water-heater"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="3"/><path d="M10 9h4M12 14v3"/></svg></span><span><b>Water heater</b><span>No hot water, leaking tank</span></span></a>
-        <div class="svccard off t-electrical"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg></span><span><b>Electrical<span class="pill plain">Coming soon</span></b><span>Partial power loss, breaker, outlet</span></span></div>
-        <div class="svccard off t-appliances"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="13" r="4"/></svg></span><span><b>Appliances<span class="pill plain">Coming soon</span></b><span>Fridge, washer, dryer, oven</span></span></div>
+      <div class="hx">
+        <div class="hx-text">
+          <h2>Where in the house?</h2>
+          <p class="sub">Point to the trouble. Every spot is a problem our pros fix, and each one opens a request with it filled in.</p>
+          <div class="hlist">
+          <div class="hg t-heating"><h3>Heating and cooling</h3><ul><li><a href="/request?s=heating&amp;p=no-heat" data-k="no-heat"><b>No heat</b><span>Furnace, boiler, or heat pump not heating</span></a></li><li><a href="/request?s=cooling&amp;p=no-cooling" data-k="no-cooling"><b>No cooling</b><span>AC or heat pump not cooling</span></a></li><li><a href="/request?s=heating&amp;p=leak" data-k="leak"><b>Water leaking from unit</b><span>Water around the furnace or air handler</span></a></li><li><a href="/request?s=heating&amp;p=noise" data-k="noise"><b>Loud noise or burning smell</b><span>Banging, grinding, or an electrical smell</span></a></li><li><a href="/request?s=heating&amp;p=thermostat" data-k="thermostat"><b>Thermostat not working</b><span>Blank screen or system will not respond</span></a></li></ul><a class="hub" href="/hvac">HVAC pros by county</a></div>
+          <div class="hg t-plumbing"><h3>Plumbing</h3><ul><li><a href="/request?s=plumbing&amp;p=burst-pipe" data-k="burst-pipe"><b>Burst or leaking pipe</b><span>Water spraying, dripping, or a wet ceiling or wall</span></a></li><li><a href="/request?s=plumbing&amp;p=clog" data-k="clog"><b>Clogged drain or backup</b><span>Sink, tub, toilet, or sewer line backing up</span></a></li><li><a href="/request?s=plumbing&amp;p=toilet" data-k="toilet"><b>Toilet problem</b><span>Overflowing, running nonstop, or will not flush</span></a></li><li><a href="/request?s=plumbing&amp;p=sump" data-k="sump"><b>Sump pump not working</b><span>Water rising in the pit or basement</span></a></li></ul><a class="hub" href="/plumbing">Plumbers by county</a></div>
+          <div class="hg t-water-heater"><h3>Water heater</h3><ul><li><a href="/request?s=water-heater&amp;p=no-hot-water" data-k="no-hot-water"><b>No hot water</b><span>Water heater not heating or running out fast</span></a></li><li><a href="/request?s=water-heater&amp;p=wh-leak" data-k="wh-leak"><b>Water heater leaking</b><span>Water under or around the tank</span></a></li></ul><a class="hub" href="/plumbing">Water heater pros by county</a></div>
+          </div>
+          <p class="soon">Electrical and appliances are coming soon. Not sure it needs a visit? Try our <a href="/help">quick checks</a> first.</p>
+        </div>
+        <div class="hx-art">
+          <svg class="house" viewBox="0 0 600 520" role="img" aria-labelledby="hs-t"><title id="hs-t">Cutaway of a house showing where each problem happens</title><defs><pattern id="soil" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" class="hatch"/></pattern></defs>
+<rect x="0" y="380" width="600" height="140" fill="url(#soil)" class="soil"/><line x1="0" y1="380" x2="600" y2="380" class="ground"/>
+<rect x="392" y="52" width="26" height="60" class="chim"/><polygon points="66,150 280,34 494,150" class="roof"/><circle cx="160" cy="128" r="10" class="win"/>
+<rect x="90" y="150" width="380" height="350" class="shell"/><line x1="90" y1="270" x2="470" y2="270" class="floor"/><line x1="90" y1="380" x2="470" y2="380" class="floor"/>
+<line x1="250" y1="150" x2="250" y2="380" class="wall"/>
+<rect x="300" y="100" width="76" height="34" rx="3" class="eq hv"/><line x1="300" y1="117" x2="200" y2="117" class="duct"/><line x1="200" y1="117" x2="200" y2="150" class="duct"/><path d="M332 136 q-3 6 0 9 q3 -3 0 -9z" class="drop"/>
+<rect x="112" y="226" width="30" height="34" rx="4" class="fx"/><rect x="108" y="214" width="38" height="14" rx="3" class="fx"/><rect x="176" y="236" width="62" height="24" rx="10" class="fx"/>
+<rect x="350" y="232" width="96" height="28" rx="4" class="fx soft"/><rect x="350" y="220" width="22" height="14" rx="3" class="fx soft"/>
+<line x1="262" y1="500" x2="262" y2="190" class="pipe"/><line x1="262" y1="190" x2="230" y2="190" class="pipe"/><path d="M262 262 l-12 -8 M262 262 l-14 2 M262 262 l-10 10 M262 262 l12 -8 M262 262 l14 2" class="spray"/><ellipse cx="300" cy="273" rx="26" ry="4" class="stain"/>
+<rect x="104" y="338" width="132" height="42" class="fx soft"/><rect x="146" y="332" width="44" height="8" rx="2" class="fx"/><path d="M168 324 v-14 h10" class="pipe thin"/>
+<rect x="386" y="306" width="16" height="22" rx="3" class="fx hv"/><rect x="300" y="350" width="120" height="30" rx="8" class="fx soft"/>
+<rect x="110" y="404" width="64" height="86" rx="4" class="eq hv"/><rect x="122" y="452" width="40" height="18" rx="2" class="flame"/><path d="M186 396 q6 -6 12 0 q6 6 12 0" class="noise"/>
+<rect x="262" y="408" width="48" height="84" rx="20" class="eq wh"/><ellipse cx="300" cy="494" rx="34" ry="5" class="puddle"/>
+<rect x="392" y="456" width="56" height="44" class="pit"/><rect x="408" y="462" width="24" height="26" rx="3" class="eq pl"/>
+<rect x="508" y="336" width="78" height="44" rx="4" class="eq cl"/><circle cx="547" cy="358" r="14" class="fan"/>
+<a href="/request?s=heating&amp;p=no-heat" class="pin t-heating" data-k="no-heat" data-x="58" data-y="430" aria-label="No heat"><line x1="110" y1="430" x2="58" y2="430" class="lead"/><circle cx="110" cy="430" r="3" class="anchor"/><circle cx="58" cy="430" r="11" class="ring"/><circle cx="58" cy="430" r="4" class="dot"/></a><a href="/request?s=cooling&amp;p=no-cooling" class="pin t-cooling" data-k="no-cooling" data-x="547" data-y="306" aria-label="No cooling"><line x1="547" y1="336" x2="547" y2="306" class="lead"/><circle cx="547" cy="336" r="3" class="anchor"/><circle cx="547" cy="306" r="11" class="ring"/><circle cx="547" cy="306" r="4" class="dot"/></a><a href="/request?s=heating&amp;p=leak" class="pin t-heating" data-k="leak" data-x="410" data-y="124" aria-label="Water leaking from unit"><line x1="376" y1="117" x2="410" y2="124" class="lead"/><circle cx="376" cy="117" r="3" class="anchor"/><circle cx="410" cy="124" r="11" class="ring"/><circle cx="410" cy="124" r="4" class="dot"/></a><a href="/request?s=heating&amp;p=noise" class="pin t-heating" data-k="noise" data-x="226" data-y="424" aria-label="Loud noise or burning smell"><line x1="204" y1="396" x2="226" y2="424" class="lead"/><circle cx="204" cy="396" r="3" class="anchor"/><circle cx="226" cy="424" r="11" class="ring"/><circle cx="226" cy="424" r="4" class="dot"/></a><a href="/request?s=heating&amp;p=thermostat" class="pin t-heating" data-k="thermostat" data-x="436" data-y="298" aria-label="Thermostat not working"><line x1="402" y1="317" x2="436" y2="298" class="lead"/><circle cx="402" cy="317" r="3" class="anchor"/><circle cx="436" cy="298" r="11" class="ring"/><circle cx="436" cy="298" r="4" class="dot"/></a><a href="/request?s=plumbing&amp;p=burst-pipe" class="pin t-plumbing" data-k="burst-pipe" data-x="300" data-y="236" aria-label="Burst or leaking pipe"><line x1="262" y1="262" x2="300" y2="236" class="lead"/><circle cx="262" cy="262" r="3" class="anchor"/><circle cx="300" cy="236" r="11" class="ring"/><circle cx="300" cy="236" r="4" class="dot"/></a><a href="/request?s=plumbing&amp;p=clog" class="pin t-plumbing" data-k="clog" data-x="216" data-y="306" aria-label="Clogged drain or backup"><line x1="184" y1="334" x2="216" y2="306" class="lead"/><circle cx="184" cy="334" r="3" class="anchor"/><circle cx="216" cy="306" r="11" class="ring"/><circle cx="216" cy="306" r="4" class="dot"/></a><a href="/request?s=plumbing&amp;p=toilet" class="pin t-plumbing" data-k="toilet" data-x="166" data-y="190" aria-label="Toilet problem"><line x1="135" y1="214" x2="166" y2="190" class="lead"/><circle cx="135" cy="214" r="3" class="anchor"/><circle cx="166" cy="190" r="11" class="ring"/><circle cx="166" cy="190" r="4" class="dot"/></a><a href="/request?s=plumbing&amp;p=sump" class="pin t-plumbing" data-k="sump" data-x="420" data-y="420" aria-label="Sump pump not working"><line x1="420" y1="456" x2="420" y2="420" class="lead"/><circle cx="420" cy="456" r="3" class="anchor"/><circle cx="420" cy="420" r="11" class="ring"/><circle cx="420" cy="420" r="4" class="dot"/></a><a href="/request?s=water-heater&amp;p=no-hot-water" class="pin t-water-heater" data-k="no-hot-water" data-x="338" data-y="400" aria-label="No hot water"><line x1="306" y1="420" x2="338" y2="400" class="lead"/><circle cx="306" cy="420" r="3" class="anchor"/><circle cx="338" cy="400" r="11" class="ring"/><circle cx="338" cy="400" r="4" class="dot"/></a><a href="/request?s=water-heater&amp;p=wh-leak" class="pin t-water-heater" data-k="wh-leak" data-x="356" data-y="470" aria-label="Water heater leaking"><line x1="320" y1="494" x2="356" y2="470" class="lead"/><circle cx="320" cy="494" r="3" class="anchor"/><circle cx="356" cy="470" r="11" class="ring"/><circle cx="356" cy="470" r="4" class="dot"/></a></svg>
+          <p class="flag" id="hx-flag" aria-hidden="true"></p>
+          <p class="tip">Hover or tap a spot to see the problem.</p>
+        </div>
+      </div>
 <!-- services:end -->
-      </div>
-      <p class="sub" style="margin-top:16px">Not sure it needs a visit? Try our <a href="/help">quick checks</a> first. A dead battery shouldn't cost you a visit fee.</p>
-    </div>
-  </section>
-
-  <section class="sec">
-    <div class="wrap">
-      <div class="head"><h2>What you'll see after you ask</h2><span class="pill plain">Example</span></div>
-      <div class="offers" aria-label="Example of two offers">
-        <div class="offer"><svg class="ring" width="72" height="72" viewBox="0 0 72 72" role="img" aria-label="Arrives in about 45 minutes"><circle class="track" cx="36" cy="36" r="30" fill="none" stroke-width="7"></circle><circle class="arc" cx="36" cy="36" r="30" fill="none" stroke-width="7" stroke-linecap="round" stroke-dasharray="141 189" transform="rotate(-90 36 36)"></circle><text x="36" y="41" text-anchor="middle">45m</text></svg><span><b>Example Plumbing Co.</b><br><span class="sub">$95 visit · License on file</span></span><i>Choose</i></div>
-        <div class="offer"><svg class="ring" width="72" height="72" viewBox="0 0 72 72" role="img" aria-label="Arrives in about 90 minutes"><circle class="track" cx="36" cy="36" r="30" fill="none" stroke-width="7"></circle><circle class="arc" cx="36" cy="36" r="30" fill="none" stroke-width="7" stroke-linecap="round" stroke-dasharray="80 189" transform="rotate(-90 36 36)"></circle><text x="36" y="41" text-anchor="middle">90m</text></svg><span><b>Sample Pipe and Drain</b><br><span class="sub">$79 visit · License on file</span></span><i>Choose</i></div>
-      </div>
-      <p class="sub small" style="margin-top:12px">Made-up companies to show the layout. Real offers come from licensed pros who said they can come.</p>
     </div>
   </section>
 
   <section class="sec" id="how">
     <div class="wrap">
       <h2>How it works</h2>
+      <p class="sub">Three steps. You only talk to the pro you pick.</p>
 <!-- how:start -->
-      <ol class="how">
-        <li><span class="n">1</span><b>Pick the service and your ZIP</b><span>Tell us what's wrong. It takes about a minute.</span></li>
-        <li><span class="n">2</span><b>Nearby pros say yes</b><span>Each one who's free sends an arrival time and visit fee.</span></li>
-        <li><span class="n">3</span><b>You choose one</b><span>Compare up to 3. Only the one you pick gets your name, number, and address.</span></li>
+      <ol class="story">
+        <li><div class="pic" aria-hidden="true"><div class="mini-tk"><div class="mt-row"><small>What's wrong</small>No heat</div><div class="mt-row"><small>ZIP code</small>07059</div></div></div>
+          <span class="n">1</span><h3>Tell us what broke</h3><p>Pick the problem and your ZIP. It takes about a minute, and you don't sign up.</p></li>
+        <li><div class="pic" aria-hidden="true"><div class="mini-of"><span class="t">45 min</span><span><b>Example Plumbing Co.</b><small>$95 visit, license on file</small></span></div><div class="mini-of"><span class="t">90 min</span><span><b>Sample Pipe and Drain</b><small>$79 visit, license on file</small></span></div></div>
+          <span class="n">2</span><h3>Free pros say yes</h3><p>Licensed pros in your county who can come send an arrival time and a visit fee. Up to 3 offers.</p></li>
+        <li><div class="pic" aria-hidden="true"><div class="mini-of picked"><span class="t">45 min</span><span><b>Example Plumbing Co.</b><small>Calling you now</small></span><em class="mini-stamp">Booked</em></div></div>
+          <span class="n">3</span><h3>You choose one</h3><p>Only the pro you pick gets your name, number, and address. They call to confirm.</p></li>
       </ol>
 <!-- how:end -->
-      <p class="sub" style="margin-top:20px">No one free within <span class="window-min">15</span> minutes? We say so and show pros you can call directly.</p>
+      <p class="sub small">Companies shown are made up. No one free within <span class="window-min">15</span> minutes? We say so and show pros you can call directly.</p>
     </div>
   </section>
 
@@ -142,18 +162,19 @@
   </section>
 
   <section class="band" id="pros">
-    <div class="wrap"><div>
+    <div class="wrap"><div class="proband">
       <div class="stack">
-        <p class="eyebrow">For HVAC, plumbing, electrical, and appliance pros</p>
-        <h2>Put your company on the map</h2>
-        <p class="lede">Emergency requests in your counties, during your hours. Say yes with one tap. Saying no never counts against you.</p>
+        <h2>Run a repair company in New Jersey?</h2>
+        <p class="lede">Get emergency requests in your counties, during your hours. Say yes with one tap. Saying no never counts against you.</p>
+<!-- proterms:start -->
+        <ul class="terms"><li>Free during our launch, no lead fees</li><li>No monthly fee or contract</li><li>Only you get the customer's details</li></ul>
+<!-- proterms:end -->
         <div><a class="btn lg" href="/contractors">Apply to join</a></div>
       </div>
-      <div class="stats" id="pro-stats">
-        <div><b>$0</b><span>lead fees during our launch</span></div>
-        <div><b>$0</b><span>monthly fee, no contract</span></div>
-        <div><b>1 tap</b><span>to say yes from the alert</span></div>
-        <div><b>1</b><span>pro gets each customer's details</span></div>
+      <div class="phone" aria-label="Example of the text alert a pro gets">
+        <p class="ph-from">Text message</p>
+        <div class="bubble"><b><span data-brand>YourBrand</span>:</b> New no heat request in Somerset County (07059). Customer wants help as soon as possible. <u>Tap to say you can come</u></div>
+        <div class="ph-card"><small>Somerset County, ZIP 07059</small><b>No heat</b><small>As soon as possible. Gas furnace.</small><p>When can you get there?</p><div class="ph-btns"><span>Within 1 hour</span><span>1 to 2 hours</span></div></div>
       </div>
     </div></div>
   </section>
