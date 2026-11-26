@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- seo:start -->
-<title>Request Emergency Home Repair in New Jersey | YourBrand</title>
-<meta name="description" content="Tell us what&#39;s wrong and we&#39;ll alert licensed New Jersey pros who can come. Takes about a minute.">
+<title>Request Emergency Home Repair | YourBrand</title>
+<meta name="description" content="Tell us what&#39;s wrong and we&#39;ll alert licensed local pros who can come. Takes about a minute.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="YourBrand">
-<meta property="og:title" content="Request Emergency Home Repair in New Jersey">
-<meta property="og:description" content="Tell us what&#39;s wrong and we&#39;ll alert licensed New Jersey pros who can come. Takes about a minute.">
+<meta property="og:title" content="Request Emergency Home Repair">
+<meta property="og:description" content="Tell us what&#39;s wrong and we&#39;ll alert licensed local pros who can come. Takes about a minute.">
 <meta name="twitter:card" content="summary_large_image">
 <!-- seo:end -->
 <!-- head:start -->
@@ -18,16 +18,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/styles.css?v=6dd3076e">
+<link rel="stylesheet" href="/assets/styles.css?v=cb0bd0dc">
 <!-- head:end -->
 </head>
 <body>
 <div id="site-header"></div>
 <main class="page"><div class="wrap"><div class="narrow" id="app"></div></div></main>
 <div id="site-footer"></div>
-<script src="/assets/config.js?v=041d314b"></script>
-<script src="/assets/nj-zips.js?v=53ee27e0"></script>
-<script src="/assets/site.js?v=ddecd3ee"></script>
+<script src="/assets/config.js?v=918e849e"></script>
+<script src="/assets/site.js?v=c4b7ce98"></script>
 <script>
 var app = document.getElementById('app');
 var Q = new URLSearchParams(location.search);
@@ -43,7 +42,7 @@ var danger = '<button class="tile danger" type="button" data-p="gas"><b>Gas smel
 
 function showServices() {
   app.innerHTML = '<div><h1>What do you need fixed?</h1><p class="sub">Pick the kind of help. Licensed local pros who can come will answer.</p></div>' + steps(0) +
-    '<div class="tiles" style="grid-template-columns:1fr 1fr">' + Object.keys(SITE.services).map(function (k) {
+    '<div class="tiles pair">' + Object.keys(SITE.services).map(function (k) {
       var s = SITE.services[k], inner = svcIcon(k) + '<span><b>' + esc(s.name) + '</b><span>' + esc(s.live ? s.blurb : 'Coming soon') + '</span></span>';
       return s.live ? '<button class="tile svc t-' + k + '" type="button" data-s="' + k + '">' + inner + '</button>' : '<div class="tile svc off t-' + k + '">' + inner + '</div>';
     }).join('') + danger + '</div>' +
@@ -51,7 +50,7 @@ function showServices() {
 }
 function showProblems() {
   app.innerHTML = '<div><h1>' + esc(SITE.services[service].name) + ': what\'s going on?</h1><p class="sub">Pick the closest match.</p></div>' + steps(0) +
-    '<div class="tiles" style="grid-template-columns:1fr 1fr">' + Object.keys(SITE.problems).filter(function (k) { return SITE.problems[k][2].indexOf(service) > -1; }).map(function (k) { var e = SITE.problems[k]; return '<button class="tile" type="button" data-p="' + k + '"><b>' + esc(e[0]) + '</b><span>' + esc(e[1]) + '</span></button>'; }).join('') + danger + '</div>' +
+    '<div class="tiles pair">' + Object.keys(SITE.problems).filter(function (k) { return SITE.problems[k][2].indexOf(service) > -1; }).map(function (k) { var e = SITE.problems[k]; return '<button class="tile" type="button" data-p="' + k + '"><b>' + esc(e[0]) + '</b><span>' + esc(e[1]) + '</span></button>'; }).join('') + danger + '</div>' +
     '<div><button class="btn ghost" type="button" data-back="services">Back to services</button></div>';
 }
 function showGas() {
@@ -62,8 +61,8 @@ function showForm() {
   var hvac = SITE.services[service].trade === 'hvac';
   app.innerHTML = '<div class="stack"><p class="eyebrow">' + esc(SITE.services[service].name) + '</p><h1>' + esc(SITE.problems[problem][0]) + '</h1><p class="sub">A few details so ' + esc(trade().pros) + ' know if they can help.</p></div>' + steps(1) +
     '<form class="card" id="f" novalidate>' +
-    '<div class="row"><div><label for="zip">ZIP code</label><input type="text" id="zip" inputmode="numeric" maxlength="5" autocomplete="postal-code"></div>' +
-    '<div><label for="county">County</label><select id="county"><option value="">Choose your county</option>' + opts(SITE.counties) + '</select></div></div>' +
+    '<div><label for="zip">ZIP code</label><input type="text" id="zip" inputmode="numeric" maxlength="5" autocomplete="postal-code" style="max-width:12em"><p class="small sub" id="place" style="margin-top:6px" aria-live="polite"></p><input type="hidden" id="county"></div>' +
+    '<div id="county-pick" hidden></div>' +
     '<div class="row"><div><label for="phone">Phone number</label><input type="tel" id="phone" autocomplete="tel"></div>' +
     '<div><label for="email">Email</label><input type="email" id="email" autocomplete="email"></div></div>' +
     '<div class="row"><div><label for="timing">How soon?</label><select id="timing">' + opts(SITE.timings) + '</select></div>' +
@@ -90,12 +89,25 @@ function showForm() {
   // Bring back anything typed earlier in this tab, then anything chosen on the page they came from.
   restoreDraft();
   document.getElementById('auto').addEventListener('change', function (e) { document.getElementById('autofee').hidden = !e.target.checked; });
-  if (SITE.counties.indexOf(Q.get('county')) > -1) document.getElementById('county').value = Q.get('county');
+  // Came from a state page with a county chosen: keep it until they type a ZIP.
+  if (/^[^<>]{3,60}, [A-Z]{2}$/.test(Q.get('county') || '') && !document.getElementById('zip').value) { document.getElementById('county').value = Q.get('county'); document.getElementById('place').textContent = Q.get('county'); }
   if (SITE.timings.indexOf(Q.get('timing')) > -1) document.getElementById('timing').value = Q.get('timing');
   if (/^\d{5}$/.test(Q.get('zip') || '')) { document.getElementById('zip').value = Q.get('zip'); zipToCounty(); }
 }
 var FIELDS = ['zip', 'county', 'timing', 'system', 'note', 'name', 'phone', 'email', 'address'];
-function zipToCounty() { var hit = window.NJ_ZIPS && window.NJ_ZIPS[document.getElementById('zip').value.trim()]; if (hit) document.getElementById('county').value = SITE.counties[hit[0]]; }
+// The county comes from the ZIP. If we don't know the ZIP (new, or PO-box only), they pick their state and county instead.
+var picker = null;
+function zipToCounty() {
+  var z = document.getElementById('zip').value.trim(), place = document.getElementById('place'), county = document.getElementById('county'), box = document.getElementById('county-pick');
+  if (!/^\d{5}$/.test(z)) return;
+  zipPlace(z).then(function (hit) {
+    if (!document.getElementById('zip') || document.getElementById('zip').value.trim() !== z || hit === undefined) return;
+    if (hit) { county.value = hit.county; place.textContent = (hit.town ? hit.town + ', ' : '') + hit.county; box.hidden = true; return; }
+    place.textContent = 'We don\'t have that ZIP code on file. Pick your state and county.';
+    box.hidden = false;
+    if (!picker || !box.firstChild) picker = countyPicker(box, { id: 'rc', value: county.value, onChange: function (v) { county.value = v; } });
+  });
+}
 function saveDraft() { try { var d = {}; FIELDS.forEach(function (k) { d[k] = document.getElementById(k).value; }); sessionStorage.setItem('draft', JSON.stringify(d)); } catch (e) {} }
 function restoreDraft() { try { var d = JSON.parse(sessionStorage.getItem('draft') || '{}'); FIELDS.forEach(function (k) { var el = document.getElementById(k); if (d[k] && el.type !== 'hidden') el.value = d[k]; }); } catch (e) {} }
 app.addEventListener('input', function (e) { if (!document.getElementById('f')) return; if (e.target.id === 'zip') zipToCounty(); saveDraft(); });

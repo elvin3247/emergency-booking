@@ -1,7 +1,7 @@
 // GET ?id=: a contractor's public profile. Approved contractors only, and never anything private.
 const C = require('../lib/config');
 const store = require('../lib/store');
-const { wrap, bad, str } = require('../lib/http');
+const { licText, wrap, bad, str } = require('../lib/http');
 
 module.exports = wrap({
   async GET({ query }) {
@@ -12,7 +12,7 @@ module.exports = wrap({
     const timed = reviews.filter(r => r.on_time != null);
     const enough = reviews.length >= C.minReviews;
     return {
-      company: c.company, trades: c.trades || ['hvac'], license: c.license, counties: c.counties, about: c.about || '', years_in_business: c.years_in_business, website: c.website || '',
+      company: c.company, trades: c.trades || ['hvac'], license: licText(c), counties: c.counties, about: c.about || '', years_in_business: c.years_in_business, website: c.website || '',
       member_since: c.created_at, business_phone: c.business_phone, visit_fee: c.visit_fee,
       reviews: {
         count: reviews.length,

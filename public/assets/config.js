@@ -21,29 +21,17 @@
     confirmMin: 10,     // the chosen pro should confirm within this many minutes, or the homeowner is offered another pro
     standbyMin: 30,     // after a match, the other pros who said yes stay on standby this long
     keepPhotosDays: 90, // photos are deleted after this many days
-    // Counties that share a border, for widening a search.
-    neighbors: {
-      Atlantic: ['Burlington', 'Camden', 'Gloucester', 'Cumberland', 'Cape May', 'Ocean'], Bergen: ['Passaic', 'Hudson', 'Essex'],
-      Burlington: ['Mercer', 'Monmouth', 'Ocean', 'Atlantic', 'Camden'], Camden: ['Burlington', 'Gloucester', 'Atlantic'],
-      'Cape May': ['Atlantic', 'Cumberland'], Cumberland: ['Salem', 'Gloucester', 'Atlantic', 'Cape May'],
-      Essex: ['Passaic', 'Bergen', 'Hudson', 'Union', 'Morris'], Gloucester: ['Camden', 'Salem', 'Cumberland', 'Atlantic'],
-      Hudson: ['Bergen', 'Essex', 'Union'], Hunterdon: ['Warren', 'Morris', 'Somerset', 'Mercer'],
-      Mercer: ['Hunterdon', 'Somerset', 'Middlesex', 'Monmouth', 'Burlington'], Middlesex: ['Somerset', 'Union', 'Monmouth', 'Mercer'],
-      Monmouth: ['Middlesex', 'Mercer', 'Burlington', 'Ocean'], Morris: ['Sussex', 'Passaic', 'Essex', 'Union', 'Somerset', 'Hunterdon', 'Warren'],
-      Ocean: ['Monmouth', 'Burlington', 'Atlantic'], Passaic: ['Sussex', 'Morris', 'Essex', 'Bergen'], Salem: ['Gloucester', 'Cumberland'],
-      Somerset: ['Hunterdon', 'Morris', 'Union', 'Middlesex', 'Mercer'], Sussex: ['Warren', 'Morris', 'Passaic'],
-      Union: ['Essex', 'Morris', 'Somerset', 'Middlesex', 'Hudson'], Warren: ['Sussex', 'Morris', 'Hunterdon']
-    },
     maxPhotos: 3,       // photos a homeowner can add to a request
     minReviews: 3,      // a pro's star rating shows to homeowners once they have this many reviews
-    limits: { perContactHour: 3, perDeviceHour: 6 }, // most requests one email, phone, or internet connection can send in an hour
-    counties: ['Atlantic', 'Bergen', 'Burlington', 'Camden', 'Cape May', 'Cumberland', 'Essex', 'Gloucester', 'Hudson', 'Hunterdon', 'Mercer', 'Middlesex', 'Monmouth', 'Morris', 'Ocean', 'Passaic', 'Salem', 'Somerset', 'Sussex', 'Union', 'Warren'],
-    // The kinds of company we sign up. Each has its own New Jersey license, which you check before approving.
+    // Spam limits: most requests one email or phone can send in an hour and in a day, most from one internet connection in an hour,
+    // and most contractor sign-ups from one connection in an hour.
+    limits: { perContactHour: 3, perContactDay: 6, perDeviceHour: 6, signupsPerDeviceHour: 4 },
+    // The kinds of company we sign up. Licenses differ by state (and some states license by city), so you review each one before approving.
     trades: {
-      hvac: { name: 'Heating and cooling', pro: 'HVAC contractor', pros: 'HVAC contractors', license: 'NJ HVACR license', slug: 'hvac', seo: 'HVAC repair' },
-      plumbing: { name: 'Plumbing', pro: 'plumber', pros: 'plumbers', license: 'NJ master plumber license', slug: 'plumbing', seo: 'plumber' },
-      electrical: { name: 'Electrical', pro: 'electrician', pros: 'electricians', license: 'NJ electrical contractor license', slug: 'electrical', seo: 'electrician' },
-      appliance: { name: 'Appliance repair', pro: 'appliance repair pro', pros: 'appliance repair pros', license: 'NJ license or registration', slug: 'appliance-repair', seo: 'appliance repair' }
+      hvac: { name: 'Heating and cooling', pro: 'HVAC contractor', pros: 'HVAC contractors', license: 'HVAC license', slug: 'hvac', seo: 'HVAC repair' },
+      plumbing: { name: 'Plumbing', pro: 'plumber', pros: 'plumbers', license: 'Plumbing license', slug: 'plumbing', seo: 'plumber' },
+      electrical: { name: 'Electrical', pro: 'electrician', pros: 'electricians', license: 'Electrical license', slug: 'electrical', seo: 'electrician' },
+      appliance: { name: 'Appliance repair', pro: 'appliance repair pro', pros: 'appliance repair pros', license: 'License or registration', slug: 'appliance-repair', seo: 'appliance repair' }
     },
     // What homeowners pick from. `live: false` shows the service as "Soon": homeowners can't request it yet,
     // but contractors in that trade can already apply. Flip to true once you have pros signed up, then run `npm run build`.

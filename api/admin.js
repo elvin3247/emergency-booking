@@ -13,6 +13,7 @@ const { daily } = require('../lib/daily');
 const recruit = require('../lib/recruit');
 const setup = require('../lib/setup');
 const sms = require('../lib/sms');
+const geo = require('../lib/geo');
 const backup = require('../lib/backup');
 const isId = v => /^[0-9a-f-]{36}$/i.test(String(v || ''));
 const isCron = headers => {
@@ -44,7 +45,7 @@ module.exports = wrap({
     return {
       contractors: contractors.map(c => ({
         id: c.id, created_at: c.created_at, company: c.company, contact: c.contact, email: c.email, mobile: c.mobile, business_phone: c.business_phone,
-        license: c.license, trades: c.trades || ['hvac'], counties: c.counties, visit_fee: c.visit_fee, alert_hours: c.alert_hours, status: c.status,
+        license: c.license, license_state: c.license_state, no_license_reason: c.no_license_reason, trades: c.trades || ['hvac'], counties: c.counties, visit_fee: c.visit_fee, alert_hours: c.alert_hours, status: c.status,
         setup_complete: isReady(c), self_paused: isPaused(c), free_leads_left: c.free_leads_left, source: c.source,
         reviews: stars[c.id] ? { count: stars[c.id].n, avg: Math.round(stars[c.id].sum / stars[c.id].n * 10) / 10 } : null,
         owed: chosen.filter(a => a.contractor_id === c.id && a.lead_fee > 0 && !a.paid_at).reduce((t, a) => t + a.lead_fee, 0)
@@ -87,15 +88,16 @@ module.exports = wrap({
       const c = isId(body.id) && (await store.contractorsByIds([str(body.id, 64)]))[0];
       if (!c) throw bad("We couldn't find that contractor.", 404);
       const pick = (all, v) => all.filter(x => (Array.isArray(v) ? v : []).includes(x));
-      const trades = pick(Object.keys(C.trades), body.trades), counties = pick(C.counties, body.counties);
+      const trades = pick(Object.keys(C.trades), body.trades), counties = (Array.isArray(body.counties) ? body.counties : []).filter(geo.valid);
       const p = { company: str(body.company, 100), license: str(body.license, 120), business_phone: str(body.business_phone, 30) };
-      if (!p.company || !p.license) throw bad('Company and license are required.');
+      if (!p.company) throw bad('Company is required.');
+      if (!p.license && !c.no_license_reason) throw bad('Enter the license number.');
       if (!trades.length || !counties.length) throw bad('Pick at least one trade and one county.');
       await store.updateContractor(c.id, Object.assign(p, { trades, counties }));
       return { ok: true };
     }
     // After a recruiting call: email them a sign-up link with their email filled in. Added to the recruiting list so it's tracked.
-    if (body.action === 'invite') return recruit.inviteOne(body.email, body.name, body.trade, body.county);
+    if (body.action === 'invite') return recruit.inviteOne(body.email, body.name, body.trade, body.zip);
     // Recruiting list: add from a file, invite in bulk, or mark after a call.
     if (body.action === 'prospects_import') return recruit.importRows(body.rows, body.list_name);
     if (body.action === 'prospects_invite') return recruit.invite(body.ids, body.note);
@@ -127,7 +129,7 @@ module.exports = wrap({
       const phone = str(body.phone, 30);
       if (phone && !sms.e164(phone)) throw bad('Enter a 10-digit US mobile number, or leave it empty.');
       const fake = { id: 'sample', email: to, mobile: phone, sms_on: !!phone, extra_emails: [], manage_token: 'sample', company: 'Sample Co.' };
-      const req = { service: 'heating', problem: 'no-heat', zip: '07059', county: 'Somerset', timing: 'As soon as possible', system: 'Gas furnace', note: 'Sample request from your launch checklist', photos: [] };
+      const req = { service: 'heating', problem: 'no-heat', zip: '07059', county: 'Somerset County, NJ', timing: 'As soon as possible', system: 'Gas furnace', note: 'Sample request from your launch checklist', photos: [] };
       const msg = E.contractorAlert(fake, req, { token: 'sample' });
       msg.subject = '[Sample] ' + msg.subject; msg.textFor = null;
       const r = await mail.send(msg);

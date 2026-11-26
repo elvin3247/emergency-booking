@@ -9,7 +9,7 @@ create table if not exists contractors (
   email text not null unique,          -- job alerts go here until texting is added
   mobile text not null,                -- for text alerts later
   business_phone text,                 -- shown to customers; set in step 2 of sign-up
-  license text not null,               -- NJ license number(s) for their trades; verify before approving
+  license text not null,               -- license number(s) for their trades, or '' when none is required; review before approving
   trades text[] not null default '{hvac}',   -- hvac | plumbing | electrical | appliance
   counties text[] not null,
   visit_fee integer,                   -- set in step 2 of sign-up; no alerts until it is
@@ -173,6 +173,30 @@ create table if not exists prospects (
 );
 create index if not exists prospects_created_idx on prospects(created_at desc);
 alter table prospects enable row level security;
+
+-- Things that broke, for the error alerts and the admin page (safe to run again). Cleared after 30 days.
+create table if not exists errors (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  kind text not null default 'server',   -- 'server' (emailed to you) or 'browser' (a script failing on a visitor's device)
+  route text,                            -- which page or action
+  message text,
+  key text,                              -- route plus message, so repeats group together
+  stack text,
+  device text
+);
+create index if not exists errors_created_idx on errors(created_at desc);
+alter table errors enable row level security;
+create index if not exists events_name_idx on events(name, created_at);
+
+-- Nationwide (safe to run again). Counties are now stored with their state, like "Somerset County, NJ".
+-- These lines convert the old New Jersey-only names ("Somerset") once; rows already converted are left alone.
+alter table contractors add column if not exists license_state text;        -- which state issued the license
+alter table contractors add column if not exists no_license_reason text;    -- why none is needed (their state or city doesn't license the trade)
+update contractors set counties = array(select case when c ~ ', [A-Z]{2}$' then c else c || ' County, NJ' end from unnest(counties) as c) where exists (select 1 from unnest(counties) as c where c !~ ', [A-Z]{2}$');
+update contractors set license_state = 'NJ' where license_state is null and license is not null and license <> '' and exists (select 1 from unnest(counties) as c where c like '%, NJ');
+update prospects set counties = array(select case when c ~ ', [A-Z]{2}$' then c else c || ' County, NJ' end from unnest(counties) as c) where exists (select 1 from unnest(counties) as c where c !~ ', [A-Z]{2}$');
+update requests set county = county || ' County, NJ' where county is not null and county <> '' and county !~ ', [A-Z]{2}$';
 
 -- Private bucket for request photos. Only the server can read or write it.
 insert into storage.buckets (id, name, public) values ('photos', 'photos', false) on conflict (id) do nothing;

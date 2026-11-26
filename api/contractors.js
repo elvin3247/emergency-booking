@@ -3,10 +3,12 @@
 // Also POST { action: 'invite_click' | 'unsubscribe', inv }: a recruiting invite was opened, or its "no thanks" link was used.
 const C = require('../lib/config');
 const store = require('../lib/store');
+const geo = require('../lib/geo');
 const mail = require('../lib/mail');
 const sms = require('../lib/sms');
 const E = require('../lib/emails');
-const { wrap, bad, str, isEmail, digits, token } = require('../lib/http');
+const limits = require('../lib/limits');
+const { wrap, bad, str, isEmail, digits, token, deviceHash } = require('../lib/http');
 
 // Recruiting invites carry a private code (inv) that ties a sign-up back to the company you invited.
 async function prospect(inv) {
@@ -15,7 +17,7 @@ async function prospect(inv) {
 }
 
 module.exports = wrap({
-  async POST({ body }) {
+  async POST({ body, headers }) {
     if (body.action === 'invite_click') {
       const p = await prospect(body.inv);
       if (p && !p.clicked_at) await store.updateProspect(p.id, { clicked_at: new Date().toISOString() });
@@ -29,18 +31,21 @@ module.exports = wrap({
     }
 
     if (body.website) return { token: '' };
-    const counties = Array.isArray(body.counties) ? body.counties.filter(c => C.counties.includes(c)) : [];
+    const counties = Array.isArray(body.counties) ? [...new Set(body.counties.filter(geo.valid))].slice(0, 60) : [];
     const trades = Array.isArray(body.trades) ? Object.keys(C.trades).filter(t => body.trades.includes(t)) : [];
     const c = {
       company: str(body.company, 120), contact: str(body.contact, 80), email: str(body.email, 120).toLowerCase(), mobile: str(body.mobile, 30),
-      license: str(body.license, 120).toUpperCase(), counties, trades, alert_hours: C.alertHours[body.alert_hours] ? body.alert_hours : 'any', source: str(body.source, 120) || null
+      license: str(body.license, 120).toUpperCase(), license_state: geo.states[body.license_state] ? body.license_state : null, no_license_reason: str(body.no_license_reason, 300) || null, counties, trades, alert_hours: C.alertHours[body.alert_hours] ? body.alert_hours : 'any', source: str(body.source, 120) || null
     };
     if (!c.company) throw bad('Enter your company name.');
     if (!c.contact) throw bad('Enter your name so we know who to call.');
     if (!isEmail(c.email)) throw bad('Enter a valid email address. Job alerts go there.');
     if (digits(c.mobile).length < 10) throw bad('Enter a 10-digit mobile number.');
     if (!trades.length) throw bad('Pick the kind of work you do.');
-    if (c.license.length < 6) throw bad('Enter your New Jersey license number. We check it with the state before you get requests.');
+    // License rules differ by state, and some places license by city or not at all. So: a license number and where it's from,
+    // or a short note on why none is needed. Either way a person reviews it before any requests go out.
+    if (c.license) { c.no_license_reason = null; if (c.license.length < 4) throw bad('That license number looks too short.'); if (!c.license_state) throw bad('Pick the state that issued your license.'); }
+    else if (!c.no_license_reason || c.no_license_reason.length < 10) throw bad('Enter your license number. If your state or city doesn\'t license your trade, tell us that instead, in a sentence.');
     if (!counties.length) throw bad('Pick at least one county you serve.');
     // Step 2 fields are optional here (filled in on the settings page), but checked if sent.
     if (body.visit_fee != null && body.visit_fee !== '') {
@@ -52,6 +57,12 @@ module.exports = wrap({
       c.business_phone = str(body.business_phone, 30);
     }
     if (body.consent !== true) throw bad('Check the box to agree to alerts and the lead terms.');
+    // Spam limit: a few sign-ups an hour from one connection is plenty. Each one emails you, so a bot could bury your inbox.
+    const device = deviceHash(headers);
+    if (limits.on() && device) {
+      if (await store.countEvents(new Date(Date.now() - 3600000).toISOString(), { name: 'signup_try', device }) >= C.limits.signupsPerDeviceHour) await limits.block('signup', device, c.email + ', ' + c.company, 'Too many sign-ups from this connection in the last hour. Please try again later.');
+      await store.insertEvent({ name: 'signup_try', device, source: null });
+    }
     // Text alerts: a separate box they can leave unchecked.
     const now = new Date().toISOString();
     if (body.sms === true) Object.assign(c, { sms_on: true, sms_consent_at: now, sms_consent_text: C.consent.sms });

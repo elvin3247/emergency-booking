@@ -14,14 +14,14 @@ const store = require('../lib/store');
 const base = 'http://localhost:3999';
 const call = async (p, body) => { const r = await fetch(base + p, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}); return { status: r.status, data: await r.json() }; };
 const linkTo = to => { const m = mail.outbox.filter(x => x.to === to && /respond\?t=/.test(x.html)).pop(); return m.html.match(/respond\?t=([\w-]+)/)[1]; };
-const contractor = (n, counties) => ({ company: 'Test Co ' + n, contact: 'Pat', email: 'c' + n + '@example.com', mobile: '908-555-010' + n, business_phone: '908-555-020' + n, license: '19HC0000000' + n, counties, trades: ['hvac'], visit_fee: 80 + n, alert_hours: 'any', consent: true });
-const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', county: 'Somerset', timing: 'As soon as possible', system: 'Gas furnace', note: '', name: 'Sam Homeowner', phone: '908-555-0100', email: 'home@example.com', address: '12 Sample Lane', consent: true }, extra);
+const contractor = (n, counties) => ({ company: 'Test Co ' + n, contact: 'Pat', email: 'c' + n + '@example.com', mobile: '908-555-010' + n, business_phone: '908-555-020' + n, license_state: 'NJ', license: '19HC0000000' + n, counties, trades: ['hvac'], visit_fee: 80 + n, alert_hours: 'any', consent: true });
+const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', county: 'Somerset County, NJ', timing: 'As soon as possible', system: 'Gas furnace', note: '', name: 'Sam Homeowner', phone: '908-555-0100', email: 'home@example.com', address: '12 Sample Lane', consent: true }, extra);
 
 (async () => {
   await new Promise(r => server.listen(3999, r));
   try {
     // Validation
-    assert.strictEqual((await call('/api/requests', request({ zip: '10001' }))).status, 400, 'non-NJ ZIP is rejected');
+    assert.strictEqual((await call('/api/requests', request({ zip: '00000', county: 'Nowhere' }))).status, 400, 'a ZIP we cannot place, with no valid county, is rejected');
     assert.strictEqual((await call('/api/requests', request({ consent: false }))).status, 400, 'consent is required');
     assert.strictEqual((await call('/api/contractors', Object.assign(contractor(0, []), {}))).status, 400, 'counties are required');
 
@@ -32,9 +32,9 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     assert.ok(mail.outbox.some(m => /COVERAGE GAP/.test(m.subject)), 'admin is told about the gap');
 
     // Four contractors in Somerset, one elsewhere
-    for (let i = 1; i <= 4; i++) assert.strictEqual((await call('/api/contractors', contractor(i, ['Somerset', 'Morris']))).status, 200);
-    await call('/api/contractors', contractor(5, ['Bergen']));
-    assert.strictEqual((await call('/api/contractors', contractor(1, ['Somerset']))).status, 409, 'duplicate email is rejected');
+    for (let i = 1; i <= 4; i++) assert.strictEqual((await call('/api/contractors', contractor(i, ['Somerset County, NJ', 'Morris County, NJ']))).status, 200);
+    await call('/api/contractors', contractor(5, ['Bergen County, NJ']));
+    assert.strictEqual((await call('/api/contractors', contractor(1, ['Somerset County, NJ']))).status, 409, 'duplicate email is rejected');
 
     r = await call('/api/requests', request());
     const token = r.data.token;
@@ -89,10 +89,11 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
 
     // Home page coverage check
     const cov = (await call('/api/coverage')).data;
-    assert.strictEqual(cov.counties.Somerset, 'now'); assert.strictEqual(cov.counties.Bergen, 'now'); assert.strictEqual(cov.counties.Ocean, 'none');
+    assert.strictEqual(cov.counties['Somerset County, NJ'], 'now'); assert.strictEqual(cov.counties['Bergen County, NJ'], 'now'); assert.strictEqual(cov.counties['Ocean County, NJ'], undefined, 'counties with no pros are simply not listed');
+    assert.ok(cov.states.NJ.covered >= 2 && cov.states.NJ.total === 21 && !cov.states.TX, 'coverage is rolled up by state');
     assert.deepStrictEqual(cov.visit_fee, { min: 81, max: 85 });
     assert.strictEqual(cov.contractors, undefined);
-    const som = (await call('/api/coverage?county=Somerset')).data;
+    const som = (await call('/api/coverage?county=' + encodeURIComponent('Somerset County, NJ'))).data;
     assert.strictEqual(som.contractors.length, 4); assert.deepStrictEqual(Object.keys(som.contractors[0]).sort(), ['company', 'id', 'license', 'trades'], 'county list shows id, name, license, and trades only');
 
     // Visitor source is saved with the request
@@ -100,7 +101,7 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     assert.strictEqual(store._tables.requests.find(x => x.token === r.data.token).source, 'ref:agent-smith');
     assert.ok(mail.outbox.some(m => m.to === 'admin@example.com' && /ref:agent-smith/.test(m.html)), 'admin email shows the source');
     // Two-step sign-up: no requests until setup is finished; pause and resume
-    const signup = await call('/api/contractors', { company: 'Step Co', contact: 'Lee', email: 'step@example.com', mobile: '908-555-0177', license: '19HC00009999', counties: ['Somerset'], trades: ['hvac'], consent: true });
+    const signup = await call('/api/contractors', { company: 'Step Co', contact: 'Lee', email: 'step@example.com', mobile: '908-555-0177', license: '19HC00009999', license_state: 'NJ', counties: ['Somerset County, NJ'], trades: ['hvac'], consent: true });
     assert.strictEqual(signup.status, 200); const mt = signup.data.token; assert.ok(mt);
     let pro = (await call('/api/pro?t=' + mt)).data;
     assert.strictEqual(pro.setup_complete, false);
@@ -121,16 +122,16 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     const nj = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', hourCycle: 'h23' }).format(new Date(pro.paused_until));
     assert.ok(/^Mon,? 07$/.test(nj.trim()), 'pause ends Monday 7am NJ time, got ' + nj);
     assert.strictEqual(await alertedNow(), base, 'paused contractor is not alerted');
-    assert.strictEqual((await call('/api/coverage?county=Somerset')).data.contractors.length, 5, 'paused contractor still listed on county page');
+    assert.strictEqual((await call('/api/coverage?county=' + encodeURIComponent('Somerset County, NJ'))).data.contractors.length, 5, 'paused contractor still listed on county page');
     pro = (await call('/api/pro', { t: mt, action: 'pause', until: 'resume' })).data;
     assert.strictEqual(pro.paused_until, null);
     assert.strictEqual(await alertedNow(), base + 1);
     assert.strictEqual((await call('/api/pro?t=nope')).status, 404);
 
     // More than heating and cooling: requests go only to the matching trade
-    assert.strictEqual((await call('/api/contractors', Object.assign(contractor(7, ['Somerset']), { trades: [] }))).status, 400, 'a trade is required');
-    await call('/api/contractors', Object.assign(contractor(8, ['Somerset']), { trades: ['plumbing'] }));
-    await call('/api/contractors', Object.assign(contractor(9, ['Somerset']), { trades: ['hvac', 'plumbing'] }));
+    assert.strictEqual((await call('/api/contractors', Object.assign(contractor(7, ['Somerset County, NJ']), { trades: [] }))).status, 400, 'a trade is required');
+    await call('/api/contractors', Object.assign(contractor(8, ['Somerset County, NJ']), { trades: ['plumbing'] }));
+    await call('/api/contractors', Object.assign(contractor(9, ['Somerset County, NJ']), { trades: ['hvac', 'plumbing'] }));
     const before = mail.outbox.length;
     r = await call('/api/requests', request({ service: 'water-heater', problem: 'no-hot-water' }));
     assert.strictEqual(r.status, 200);
@@ -141,8 +142,8 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     assert.strictEqual(store._tables.requests.find(x => x.token === r.data.token).system, null, 'no HVAC system on a plumbing request');
     assert.strictEqual((await call('/api/requests', request({ service: 'plumbing', problem: 'no-heat' }))).status, 400, 'problem must belong to the service');
     assert.strictEqual((await call('/api/requests', request({ service: 'electrical', problem: 'breaker' }))).status, 400, 'services that are not switched on are refused');
-    const cov2 = (await call('/api/coverage?county=Somerset&trade=plumbing')).data;
-    assert.strictEqual(cov2.trades.plumbing.Somerset, 'now'); assert.strictEqual(cov2.trades.plumbing.Bergen, 'none'); assert.strictEqual(cov2.trades.electrical.Somerset, 'none');
+    const cov2 = (await call('/api/coverage?county=Somerset%20County%2C%20NJ&trade=plumbing')).data;
+    assert.strictEqual(cov2.trades.plumbing['Somerset County, NJ'], 'now'); assert.strictEqual(cov2.trades.plumbing['Bergen County, NJ'], undefined); assert.strictEqual(cov2.trades.electrical['Somerset County, NJ'], undefined);
     assert.strictEqual(cov2.contractors.length, 2, 'county list can be narrowed to one trade');
     pro = (await call('/api/pro', { t: mt, action: 'settings', visit_fee: 99, business_phone: '908-555-0188', trades: ['hvac', 'electrical'] })).data;
     assert.deepStrictEqual(pro.trades, ['hvac', 'electrical']);
@@ -185,7 +186,7 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     await adm({ action: 'paid', id: fee.id });
     assert.strictEqual((await adm()).data.contractors.find(c => c.email === 'c2@example.com').owed, 0, 'marking paid clears what is owed');
     await adm({ action: 'status', id: c8.id, status: 'paused' });
-    assert.strictEqual((await call('/api/coverage?county=Somerset&trade=plumbing')).data.contractors.length, 1, 'paused contractor drops off the site');
+    assert.strictEqual((await call('/api/coverage?county=Somerset%20County%2C%20NJ&trade=plumbing')).data.contractors.length, 1, 'paused contractor drops off the site');
     const n = mail.outbox.length;
     await adm({ action: 'status', id: c8.id, status: 'approved' });
     assert.ok(mail.outbox.slice(n).some(m => m.to === 'c8@example.com' && /approved/.test(m.subject)), 'approval emails the contractor');
@@ -202,9 +203,9 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     // ===== Cancel, no-show, photos, on-the-way, job results, dashboard, profiles, link recovery =====
     const T2 = store._tables;
     const approve = email => { T2.contractors.find(c => c.email === email).status = 'approved'; };
-    for (const n of [20, 21, 22]) { await call('/api/contractors', Object.assign(contractor(n, ['Hunterdon']), { trades: ['plumbing'] })); approve('c' + n + '@example.com'); }
+    for (const n of [20, 21, 22]) { await call('/api/contractors', Object.assign(contractor(n, ['Hunterdon County, NJ']), { trades: ['plumbing'] })); approve('c' + n + '@example.com'); }
     const linkFor = (email, kind) => { const m = mail.outbox.filter(x => x.to === email && x.html.includes(kind + '?t=')).pop(); return m && m.html.match(new RegExp(kind + '\\?t=([\\w-]+)'))[1]; };
-    const hReq = extra => request(Object.assign({ service: 'plumbing', problem: 'clog', county: 'Hunterdon', zip: '08822', email: 'hunt@example.com', phone: '908-555-0177' }, extra));
+    const hReq = extra => request(Object.assign({ service: 'plumbing', problem: 'clog', county: 'Hunterdon County, NJ', zip: '08822', email: 'hunt@example.com', phone: '908-555-0177' }, extra));
     let R = (await call('/api/requests', hReq())).data.token;
     const t20 = linkFor('c20@example.com', 'respond'), t21 = linkFor('c21@example.com', 'respond'), t22 = linkFor('c22@example.com', 'respond');
     assert.ok(t20 && t21 && t22, 'all three Hunterdon plumbers alerted');
@@ -319,8 +320,8 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     process.env.RATE_LIMITS = 'off';
 
     // ===== Alert first, details second; book automatically; typical answer times =====
-    for (const n of [30, 31]) { await call('/api/contractors', Object.assign(contractor(n, ['Sussex']), { trades: ['plumbing'] })); approve('c' + n + '@example.com'); }
-    const sReq = extra => hReq(Object.assign({ county: 'Sussex', zip: '07860', email: 'sx@example.com', phone: '973-555-0101', name: '', address: '' }, extra));
+    for (const n of [30, 31]) { await call('/api/contractors', Object.assign(contractor(n, ['Sussex County, NJ']), { trades: ['plumbing'] })); approve('c' + n + '@example.com'); }
+    const sReq = extra => hReq(Object.assign({ county: 'Sussex County, NJ', zip: '07860', email: 'sx@example.com', phone: '973-555-0101', name: '', address: '' }, extra));
     let Q = (await call('/api/requests', sReq())).data.token;
     let qs = (await call('/api/requests?token=' + Q)).data;
     assert.strictEqual(qs.needs_details, true, 'request goes out without name and address');
@@ -354,18 +355,18 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
 
     // Typical answer time: only shown with enough history (5+ requests with a yes in that county and trade)
     const speedLib = require('../lib/speed'); speedLib.reset();
-    assert.ok(!((await call('/api/coverage')).data.speed.plumbing || {}).Sussex, 'four Sussex requests is not enough history');
+    assert.ok(!((await call('/api/coverage')).data.speed.plumbing || {})['Sussex County, NJ'], 'four Sussex requests is not enough history');
     const Q5 = (await call('/api/requests', sReq({ problem: 'clog', email: 'sx5@example.com', phone: '973-555-0105', name: 'Lee', address: '1 Main St' }))).data.token;
     await call('/api/alerts', { t: linkFor('c30@example.com', 'respond'), action: 'accept', arrival: '2 to 4 hours', visit_fee: 90 });
     speedLib.reset();
-    assert.ok((await call('/api/coverage')).data.speed.plumbing.Sussex >= 1, 'five is enough');
+    assert.ok((await call('/api/coverage')).data.speed.plumbing['Sussex County, NJ'] >= 1, 'five is enough');
     const tq = (await call('/api/requests?token=' + Q5)).data.typical;
     assert.ok(tq && tq.where === 'county' && tq.min >= 1, 'request page gets the typical time');
 
     // Free launch: nothing charged, and each pro's free leads are kept for when fees start
     const Cfg = require('../lib/config'); Cfg.freeLaunch = true;
-    await call('/api/contractors', Object.assign(contractor(40, ['Warren']), { trades: ['plumbing'] })); approve('c40@example.com');
-    const W = (await call('/api/requests', hReq({ county: 'Warren', zip: '07882', email: 'wf@example.com', phone: '908-555-0400', problem: 'clog' }))).data.token;
+    await call('/api/contractors', Object.assign(contractor(40, ['Warren County, NJ']), { trades: ['plumbing'] })); approve('c40@example.com');
+    const W = (await call('/api/requests', hReq({ county: 'Warren County, NJ', zip: '07882', email: 'wf@example.com', phone: '908-555-0400', problem: 'clog' }))).data.token;
     assert.ok(/no lead fees during our launch/i.test(mail.outbox.filter(m => m.to === 'c40@example.com').pop().html), 'alert says it is free');
     await call('/api/alerts', { t: linkFor('c40@example.com', 'respond'), action: 'accept', arrival: '1 to 2 hours', visit_fee: 90 });
     const wo = (await call('/api/requests?token=' + W)).data.offers[0];
@@ -383,7 +384,7 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     back(reqRow(H), 'created_at', 11);
     let n1 = mail.outbox.length;
     let hs = (await call('/api/requests?token=' + H)).data;
-    assert.ok(hs.widened_to.includes('Warren'), 'search widened to neighboring counties');
+    assert.ok(hs.widened_to.includes('Warren County, NJ'), 'search widened to neighboring counties');
     const wsent = mail.outbox.slice(n1);
     assert.ok(wsent.some(m => m.to === 'c40@example.com' && /^New toilet problem in /.test(m.subject) && /just outside your counties/.test(m.html)), 'Warren plumber alerted, with the town in the subject');
     assert.ok(wsent.some(m => m.to === 'c21@example.com' && /^Still open, no answers yet/.test(m.subject)), 'first pros nudged');
@@ -428,7 +429,7 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
 
     // Daily job: review reminder, closed-request email, old photos deleted, morning summary. Runs safely twice.
     back(reqRow(H), 'matched_at', 7 * 60);
-    const O = (await call('/api/requests', hReq({ county: 'Salem', zip: '08079', problem: 'clog', email: 'old@example.com', phone: '856-555-0101' }))).data.token;
+    const O = (await call('/api/requests', hReq({ county: 'Salem County, NJ', zip: '08079', problem: 'clog', email: 'old@example.com', phone: '856-555-0101' }))).data.token;
     back(reqRow(O), 'created_at', 13 * 60);
     back(reqRow(R), 'created_at', 91 * 24 * 60);
     const photoCount = reqRow(R).photos.length;
@@ -455,26 +456,26 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     await adm({ action: 'hide_review', id: reqRow(R).id });
     assert.strictEqual((await call('/api/company?id=' + c21id)).data.reviews.count, rcount - 1, 'hidden review drops off the profile');
     await adm({ action: 'hide_review', id: reqRow(R).id, hidden: false });
-    assert.strictEqual((await adm({ action: 'edit_contractor', id: c21id, company: 'Test Co 21', license: 'NEW-LIC-1', trades: [], counties: ['Hunterdon'] })).status, 400);
-    await adm({ action: 'edit_contractor', id: c21id, company: 'Test Co 21 LLC', license: 'NEW-LIC-1', business_phone: '908-555-0221', trades: ['plumbing', 'hvac'], counties: ['Hunterdon', 'Warren'] });
+    assert.strictEqual((await adm({ action: 'edit_contractor', id: c21id, company: 'Test Co 21', license: 'NEW-LIC-1', trades: [], counties: ['Hunterdon County, NJ'] })).status, 400);
+    await adm({ action: 'edit_contractor', id: c21id, company: 'Test Co 21 LLC', license: 'NEW-LIC-1', business_phone: '908-555-0221', trades: ['plumbing', 'hvac'], counties: ['Hunterdon County, NJ', 'Warren County, NJ'] });
     const e21 = T2.contractors.find(c => c.id === c21id);
-    assert.deepStrictEqual([e21.company, e21.license, e21.trades, e21.counties], ['Test Co 21 LLC', 'NEW-LIC-1', ['hvac', 'plumbing'], ['Hunterdon', 'Warren']]);
+    assert.deepStrictEqual([e21.company, e21.license, e21.trades, e21.counties], ['Test Co 21 LLC', 'NEW-LIC-1', ['hvac', 'plumbing'], ['Hunterdon County, NJ', 'Warren County, NJ']]);
     await adm({ action: 'invite', email: 'newpro@example.com', name: 'Jo' });
     assert.ok(/contractors\?ref=invite&(amp;)?inv=[\w-]+/.test(mail.outbox.filter(m => m.to === 'newpro@example.com').pop().html), 'invite link carries the private code that fills in their email');
     assert.strictEqual((await adm({ action: 'invite', email: 'c21@example.com' })).status, 400, 'no invite to someone already signed up');
 
     // Text alerts: only pros who opted in, and the email always goes too
     const sms = require('../lib/sms'), E = require('../lib/emails');
-    const fakeReq = { service: 'heating', problem: 'no-heat', zip: '07059', county: 'Somerset', timing: 'As soon as possible', photos: [] };
+    const fakeReq = { service: 'heating', problem: 'no-heat', zip: '07059', county: 'Somerset County, NJ', timing: 'As soon as possible', photos: [] };
     const off = E.contractorAlert({ id: 'x', email: 'x@example.com', mobile: '9085550100', sms_on: false }, fakeReq, { token: 'tok' });
     const on = E.contractorAlert({ id: 'x', email: 'x@example.com', mobile: '9085550100', sms_on: true }, fakeReq, { token: 'tok' });
     assert.ok(!off.text && !off.textTo, 'no text without opt-in');
-    assert.ok(on.textTo && /^YourBrand: New job: no heat, Warren, Somerset Co\. \(07059\).*respond\?t=tok.*STOP/.test(on.text) && on.to === 'x@example.com', 'opted-in pro gets the text and the email');
+    assert.ok(on.textTo && /^YourBrand: New job: no heat, Warren, Somerset County \(07059\).*respond\?t=tok.*STOP/.test(on.text) && on.to === 'x@example.com', 'opted-in pro gets the text and the email');
     const sentTexts = sms.outbox.length;
     await mail.send(on);
     assert.strictEqual(sms.outbox.length, sentTexts + 1, 'text goes out alongside the email');
     assert.strictEqual(sms.e164('(908) 555-0100'), '+19085550100'); assert.strictEqual(sms.e164('555-0100'), null);
-    const smsSignup = await call('/api/contractors', Object.assign(contractor(77, ['Warren']), { sms: true }));
+    const smsSignup = await call('/api/contractors', Object.assign(contractor(77, ['Warren County, NJ']), { sms: true }));
     const c77 = T2.contractors.find(c => c.email === 'c77@example.com');
     assert.ok(smsSignup.status === 200 && c77.sms_on && /Reply STOP/.test(c77.sms_consent_text), 'sign-up stores the text opt-in and its wording');
     assert.strictEqual((await call('/api/pro', { t: c77.manage_token, action: 'texts', on: true, mobile: '9085550177' })).status, 400, 'turning texts on needs the box checked');
@@ -482,7 +483,7 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     assert.ok(!T2.contractors.find(c => c.email === 'c77@example.com').sms_on, 'pro can turn texts off');
 
     // Recruiting list: duplicates skipped, bulk invites need the mailing address, unsubscribes stick
-    const imp = (await adm({ action: 'prospects_import', list_name: 'Test list', rows: [{ company: 'Prospect A', email: 'pa@example.com', trades: ['hvac'], counties: ['Warren'] }, { company: 'Prospect A again', email: 'PA@example.com' }, { company: 'No Way To Reach' }, { company: 'Signed Up', email: 'c21@example.com' }] })).data;
+    const imp = (await adm({ action: 'prospects_import', list_name: 'Test list', rows: [{ company: 'Prospect A', email: 'pa@example.com', trades: ['hvac'], counties: ['Warren County, NJ'] }, { company: 'Prospect A again', email: 'PA@example.com' }, { company: 'No Way To Reach' }, { company: 'Signed Up', email: 'c21@example.com' }] })).data;
     assert.deepStrictEqual([imp.added, imp.skipped.duplicate, imp.skipped.no_contact, imp.skipped.signed_up], [1, 1, 1, 1], 'import skips duplicates, no contact, and pros already signed up');
     const pa = T2.prospects.find(p => p.email === 'pa@example.com');
     const C2 = require('../lib/config'), addr = C2.mailingAddress;
@@ -498,7 +499,7 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     assert.strictEqual((await adm({ action: 'prospects_invite', ids: [pa.id] })).data.sent, 0, 'never invited again after "no thanks"');
     C2.mailingAddress = addr;
     const recView = (await (await fetch('http://localhost:3999/api/admin?view=recruit', { headers: { 'x-admin-key': 'test-admin-key' } })).json());
-    assert.ok(recView.supply.Warren && recView.prospects.find(p => p.email === 'pa@example.com').stage === 'unsubscribed', 'recruiting view shows supply and stages');
+    assert.ok(recView.supply['Warren County, NJ'] && recView.states.NJ && recView.prospects.find(p => p.email === 'pa@example.com').stage === 'unsubscribed', 'recruiting view shows supply and stages');
 
     // Launch checklist runs in the local preview
     const setup = (await (await fetch('http://localhost:3999/api/admin?view=setup', { headers: { 'x-admin-key': 'test-admin-key' } })).json());
@@ -507,7 +508,7 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     // Backups: spreadsheet-safe, no private links, and emailed with attachments
     const backup = require('../lib/backup');
     assert.strictEqual(backup.cell('=HYPERLINK("x")'), '"\'=HYPERLINK(""x"")"', 'formulas are neutralized and quotes escaped');
-    assert.strictEqual(backup.cell(['Morris', 'Union']), 'Morris; Union');
+    assert.strictEqual(backup.cell(['Morris County, NJ', 'Union County, NJ']), '"Morris County, NJ; Union County, NJ"');
     assert.strictEqual(backup.isBackupDay(new Date('2026-11-16T15:00:00Z')), true, 'Monday in New Jersey');
     assert.strictEqual(backup.isBackupDay(new Date('2026-11-17T03:00:00Z')), true, 'still Monday night in New Jersey');
     const bk = (await adm({ action: 'backup' })).data;
@@ -516,9 +517,96 @@ const request = extra => Object.assign({ problem: 'no-heat', zip: '07059', count
     await adm({ action: 'backup', email: true });
     const bkMail = mail.outbox.filter(m => /weekly backup/.test(m.subject)).pop();
     assert.ok(bkMail && bkMail.attachments.length === 2 && Buffer.from(bkMail.attachments[0].content, 'base64').toString().startsWith('created_at,'), 'backup email carries both files');
+
+    // Error alerts: a server error is saved, emailed once, and not emailed again within the hour
+    const store2 = require('../lib/store'), realByToken = store2.requestByToken, quietErr = console.error;
+    store2.requestByToken = async () => { throw new Error('database exploded'); };
+    console.error = () => {};
+    let nErr = mail.outbox.filter(m => /site error/.test(m.subject)).length;
+    const boom = await call('/api/requests?token=abc');
+    assert.ok(boom.status === 500 && /Something went wrong on our side/.test(boom.data.error), 'visitor sees a plain message, not the real error');
+    await call('/api/requests?token=abc');
+    store2.requestByToken = realByToken; console.error = quietErr;
+    const errMails = mail.outbox.filter(m => /site error/.test(m.subject));
+    assert.strictEqual(errMails.length, nErr + 1, 'one email for the same error within an hour');
+    assert.ok(/GET \/api\/requests/.test(errMails.pop().subject) && T2.errors.filter(e => e.message === 'database exploded').length === 2, 'both errors are saved with their route');
+    // Browser errors: saved, never emailed, junk ignored, capped per problem
+    const jsErr = body => call('/api/track', Object.assign({ name: 'js_error' }, body));
+    await jsErr({ msg: 'Script error.', page: '/request' }); await jsErr({ msg: 'x is not defined', page: 'https://evil.example' });
+    for (let i = 0; i < 7; i++) await jsErr({ msg: 'x is not defined', page: '/request?s=heating', at: '/assets/site.js:10' });
+    const br = T2.errors.filter(e => e.kind === 'browser');
+    assert.ok(br.length === 5 && br[0].route === '/request', 'browser errors: junk skipped, repeats capped at 5 an hour, query string dropped');
+    const health = (await (await fetch('http://localhost:3999/api/admin?view=setup', { headers: { 'x-admin-key': 'test-admin-key' } })).json());
+    assert.ok(health.checks.find(c => c.label === 'Server errors').state === 'bad' && health.errors.find(e => e.message === 'database exploded').count === 2, 'checklist flags server errors and groups repeats');
+
+    // Spam limits: daily cap, contractor sign-ups per connection, and refused attempts listed for the admin
+    process.env.RATE_LIMITS = 'on';
+    const daily = { email: 'daily@example.com', phone: '908-555-0888' };
+    for (let i = 0; i < 6; i++) { assert.strictEqual((await call('/api/requests', request(daily))).status, 200); T2.requests.filter(r => r.email === daily.email).forEach(r => { r.created_at = new Date(Date.now() - 2 * 3600000).toISOString(); }); }
+    assert.strictEqual((await call('/api/requests', request(daily))).status, 429, 'seventh request in a day from one person is refused, even spread over hours');
+    const from = (ip, body) => fetch('http://localhost:3999/api/contractors', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip }, body: JSON.stringify(body) }).then(r => r.status);
+    for (let i = 0; i < 4; i++) assert.strictEqual(await from('203.0.113.9', contractor(80 + i, ['Sussex County, NJ'])), 200);
+    assert.strictEqual(await from('203.0.113.9', contractor(85, ['Sussex County, NJ'])), 429, 'fifth sign-up in an hour from one connection is refused');
+    assert.strictEqual(await from('203.0.113.10', contractor(86, ['Sussex County, NJ'])), 200, 'another connection is not affected');
+    process.env.RATE_LIMITS = 'off';
+    const refused = require('../lib/limits'), list = await refused.recent();
+    assert.ok(list.find(b => b.kind === 'request' && /daily@example\.com/.test(b.who)) && list.find(b => b.kind === 'signup' && /c85@example\.com/.test(b.who)), 'refused attempts are listed with who it was');
+
+    // Deliverability: DKIM, SPF, and DMARC read from DNS
+    const dnsCheck = require('../lib/dns-check');
+    const zone = recs => async name => { if (name in recs) return recs[name]; throw Object.assign(new Error('not found'), { code: 'ENOTFOUND' }); };
+    const good = await dnsCheck.check('Alerts <alerts@mail.example.com>', 'me@example.com', zone({ 'resend._domainkey.mail.example.com': [['p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCB', 'iQKBgQC']], 'send.mail.example.com': [['v=spf1 include:amazonses.com ~all']], '_dmarc.example.com': [['v=DMARC1; p=none;']] }));
+    assert.deepStrictEqual(good.map(c => c.state), ['ok', 'ok', 'ok'], 'all three records found (DMARC on the parent domain counts)');
+    const none = await dnsCheck.check('alerts@example.com', 'me@example.com', zone({}));
+    assert.ok(none.every(c => c.state === 'bad') && /Name: _dmarc\s+Value: v=DMARC1; p=none; rua=mailto:me@example\.com/.test(none[2].fix), 'missing records come with the exact record to add');
+    const slow = await dnsCheck.check('alerts@example.com', '', async () => { throw Object.assign(new Error('timeout'), { code: 'ETIMEOUT' }); });
+    assert.ok(slow.every(c => c.state === 'warn'), 'a failed lookup is "check again", not "missing"');
+    assert.strictEqual((await dnsCheck.check('me@gmail.com', '', zone({})))[0].state, 'bad', 'a free mailbox as the sender is flagged');
     const Sp = (await call('/api/requests', hReq({ problem: 'clog', email: 'spam@example.com', phone: '908-555-0666' }))).data.token;
     await adm({ action: 'cancel_request', id: reqRow(Sp).id });
     assert.strictEqual((await call('/api/requests?token=' + Sp)).data.state, 'canceled', 'admin can remove a spam request');
+
+    // ---- Nationwide ----
+    const geo = require('../lib/geo'), HH = require('../lib/http');
+    assert.deepStrictEqual(geo.zip('78701'), { zip: '78701', county: 'Travis County, TX', state: 'TX', town: 'Austin' }, 'a Texas ZIP is placed in its county');
+    assert.strictEqual(geo.zip('70112').county, 'Orleans Parish, LA', 'parishes keep their name'); assert.strictEqual(geo.zip('00000'), null);
+    assert.ok(geo.neighbors('Rockland County, NY').includes('Bergen County, NJ'), 'neighboring counties cross state lines');
+    assert.strictEqual(geo.upgrade('Cape May'), 'Cape May County, NJ', 'old New Jersey names are understood');
+    assert.strictEqual(Object.keys(geo.states).length, 51);
+    // Alert hours follow the pro's own time zone: 8pm Eastern is 5pm Pacific
+    const eightPmEastern = new Date('2026-11-18T01:00:00Z');
+    assert.strictEqual(HH.withinHours('weekday', eightPmEastern, 'America/New_York'), false); assert.strictEqual(HH.withinHours('weekday', eightPmEastern, 'America/Los_Angeles'), true);
+    assert.strictEqual(HH.zoneOf({ counties: ['Cook County, IL'] }), 'America/Chicago');
+    assert.strictEqual(HH.pauseUntil('morning', eightPmEastern, 'America/Los_Angeles').toISOString(), '2026-11-18T15:00:00.000Z', 'pause until 7am is 7am where the pro is');
+    // Licenses: a number and its state, or a reason why none is needed
+    const tx = extra => Object.assign(contractor(90, ['Travis County, TX', 'Williamson County, TX', 'Not A County, TX']), { email: 'tx@example.com', license_state: 'TX', license: 'TACLA12345E', trades: ['hvac'] }, extra);
+    assert.strictEqual((await call('/api/contractors', tx({ license_state: '' }))).status, 400, 'a license needs the state that issued it');
+    assert.strictEqual((await call('/api/contractors', tx({ license: '' }))).status, 400, 'no license needs a reason');
+    assert.strictEqual((await call('/api/contractors', tx({ email: 'ks@example.com', license: '', license_state: '', no_license_reason: 'Kansas has no state HVAC license. Wichita city license 4411.' }))).status, 200);
+    assert.strictEqual((await call('/api/contractors', tx())).status, 200);
+    const txc = T2.contractors.find(c => c.email === 'tx@example.com');
+    assert.deepStrictEqual(txc.counties, ['Travis County, TX', 'Williamson County, TX'], 'made-up counties are dropped');
+    approve('tx@example.com'); approve('ks@example.com');
+    assert.strictEqual(HH.licText(txc), 'TACLA12345E, TX'); assert.strictEqual(HH.licText(T2.contractors.find(c => c.email === 'ks@example.com')), 'not required in their area');
+    // A request from Austin: the county comes from the ZIP whatever the form sent, and only Texas pros hear about it
+    const nBefore = mail.outbox.length;
+    const atx = await call('/api/requests', request({ zip: '78701', county: 'Somerset County, NJ', email: 'atx@example.com', phone: '512-555-0101' }));
+    assert.strictEqual(atx.status, 200);
+    assert.strictEqual(reqRow(atx.data.token).county, 'Travis County, TX');
+    const txAlerted = mail.outbox.slice(nBefore).filter(m => /New no heat/.test(m.subject)).map(m => m.to).sort();
+    assert.deepStrictEqual(txAlerted, ['ks@example.com', 'tx@example.com'], 'both Texas pros alerted, nobody in New Jersey');
+    assert.ok(/in Austin request in Travis County, TX \(78701\)/.test(mail.outbox.slice(nBefore).find(m => m.to === 'tx@example.com').subject));
+    // A ZIP we don't have on file uses the county the person picked
+    const odd = await call('/api/requests', request({ zip: '99999', county: 'Travis County, TX', email: 'odd@example.com', phone: '512-555-0102' }));
+    assert.ok(odd.status === 200 && reqRow(odd.data.token).county === 'Travis County, TX');
+    const zc = (await call('/api/coverage?zip=78701')).data;
+    assert.ok(zc.place.county === 'Travis County, TX' && zc.counties['Travis County, TX'] && zc.states.TX.total === 254 && (await call('/api/coverage?zip=00000')).data.place === null, 'ZIP lookup for the forms');
+    // Recruiting lists: where a company is comes from its ZIP, or its county and state
+    const nat = (await adm({ action: 'prospects_import', list_name: 'National', rows: [{ company: 'Denver Heat', email: 'den@example.com', zip: '80202', trades: ['hvac'] }, { company: 'Dade Plumbing', email: 'mia@example.com', county: 'Miami-Dade', state: 'Florida', trades: ['plumbing'] }] })).data;
+    assert.strictEqual(nat.added, 2);
+    assert.deepStrictEqual([T2.prospects.find(p => p.email === 'den@example.com').counties, T2.prospects.find(p => p.email === 'mia@example.com').counties], [['Denver County, CO'], ['Miami-Dade County, FL']]);
+    const natView = (await (await fetch('http://localhost:3999/api/admin?view=recruit', { headers: { 'x-admin-key': 'test-admin-key' } })).json());
+    assert.ok(natView.states.TX.live === 2 && natView.states.TX.covered === 2 && natView.states.CO.prospects === 1 && natView.supply['Travis County, TX'].hvac.live === 2, 'supply is rolled up by state');
 
     console.log('All booking flow checks passed.');
   } finally { server.close(); }

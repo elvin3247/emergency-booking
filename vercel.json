@@ -32,5 +32,27 @@
       "path": "/api/admin?job=daily",
       "schedule": "0 11 * * *"
     }
+  ],
+  "functions": {
+    "api/admin.js": {
+      "maxDuration": 60
+    }
+  },
+  "redirects": [
+    {
+      "source": "/hvac/:county(.+)-county-nj",
+      "destination": "/hvac/new-jersey#:county-county",
+      "permanent": true
+    },
+    {
+      "source": "/plumbing/:county(.+)-county-nj",
+      "destination": "/plumbing/new-jersey#:county-county",
+      "permanent": true
+    },
+    {
+      "source": "/water-heater/:county(.+)-county-nj",
+      "destination": "/water-heater/new-jersey#:county-county",
+      "permanent": true
+    }
   ]
 }

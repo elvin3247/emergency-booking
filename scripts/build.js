@@ -6,14 +6,14 @@ const path = require('path');
 const C = require('../public/assets/config.js');
 const GUIDES = require('./content.js');
 const TRIAGE = require('./triage.js');
-const ZIPS = require('./nj-zips.json'); // { "07059": [countyIndex, "Warren"] }  Source: GeoNames, CC BY 4.0
+const GEO = require('../public/assets/geo.js'); // { states: { NJ: 'New Jersey' }, counties: { NJ: ['Atlantic County', ...] } }
 const PUB = path.join(__dirname, '..', 'public');
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Your live address: siteUrl in config.js, or SITE_URL when Vercel runs the build. Without one there is no sitemap or canonical links.
 const base = (C.siteUrl || process.env.SITE_URL || '').replace(/\/$/, '');
 const abs = p => (base ? base + p : '');
-const slug = county => county.toLowerCase().replace(/ /g, '-') + '-county-nj';
+const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const write = (rel, text) => { const f = path.join(PUB, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); };
 const ld = obj => '<script type="application/ld+json">' + JSON.stringify(obj).replace(/</g, '\\u003c') + '</script>';
 const org = () => Object.assign({ '@type': 'Organization', name: C.brand }, base ? { url: base } : {});
@@ -83,7 +83,6 @@ ${main}
 </main>
 ${opts.sticky ? '<div class="sticky-cta"><a class="btn" href="#book">Get help now</a></div>\n' : ''}<div id="site-footer"></div>
 <script src="/assets/config.js"></script>
-<script src="/assets/nj-zips.js"></script>
 <script src="/assets/site.js"></script>
 </body>
 </html>
@@ -151,7 +150,7 @@ const SVC_PAGES = {
 };
 const LIVE_SVC_PAGES = Object.keys(SVC_PAGES).filter(k => C.services[k] && C.services[k].live);
 // Where a group of problems lists its pros by county: its own service pages if it has them, otherwise its trade's.
-const hubFor = k => LIVE_SVC_PAGES.includes(k) ? ['/' + SVC_PAGES[k].slug, SVC_PAGES[k].name + ' by county'] : C.services[k].trade === 'hvac' ? ['/hvac', 'HVAC pros by county'] : ['/' + C.trades[C.services[k].trade].slug, cap(C.trades[C.services[k].trade].pros) + ' by county'];
+const hubFor = k => LIVE_SVC_PAGES.includes(k) ? ['/' + SVC_PAGES[k].slug, SVC_PAGES[k].name + ' by state'] : C.services[k].trade === 'hvac' ? ['/hvac', 'HVAC pros by state'] : ['/' + C.trades[C.services[k].trade].slug, cap(C.trades[C.services[k].trade].pros) + ' by state'];
 
 // Live problems, grouped the way homeowners think: heating and cooling together, every other service on its own.
 function problemGroups() {
@@ -170,7 +169,7 @@ const probHref = p => '/request?s=' + C.problems[p][2][0] + '&amp;p=' + p;
 function houseSvg(probs, pinHref, id) {
   const pins = probs.filter(p => PINS[p]).map(p => {
     const [ox, oy, x, y] = PINS[p];
-    return '<a href="' + pinHref(p) + '" class="pin t-' + C.problems[p][2][0] + '" data-k="' + p + '" data-x="' + x + '" data-y="' + y + '" aria-label="' + esc(C.problems[p][0]) + '"><line x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" class="lead"/><circle cx="' + ox + '" cy="' + oy + '" r="3" class="anchor"/><circle cx="' + x + '" cy="' + y + '" r="11" class="ring"/><circle cx="' + x + '" cy="' + y + '" r="4" class="dot"/></a>';
+    return '<a href="' + pinHref(p) + '" class="pin t-' + C.problems[p][2][0] + '" data-k="' + p + '" data-x="' + x + '" data-y="' + y + '" aria-label="' + esc(C.problems[p][0]) + '"><line x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" class="lead"/><circle cx="' + ox + '" cy="' + oy + '" r="3" class="anchor"/><circle cx="' + x + '" cy="' + y + '" r="22" class="hit"/><circle cx="' + x + '" cy="' + y + '" r="11" class="ring"/><circle cx="' + x + '" cy="' + y + '" r="4" class="dot"/></a>';
   }).join('');
   return `<svg class="house" viewBox="0 0 600 520" role="img" aria-labelledby="${id}-t"><title id="${id}-t">Cutaway of a house showing where each problem happens</title><defs><pattern id="${id}-soil" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="10" class="hatch"/></pattern></defs>
 ${HOUSE_ART.replace('url(#soil)', 'url(#' + id + '-soil)')}
@@ -204,7 +203,6 @@ const problemRows = (trade, county) => servicesOf(trade).filter(k => C.services[
   return '<div class="r"><a class="main" href="' + q + '"><b>' + esc(P[0]) + '</b><span>' + esc(P[1]) + '</span></a>' + (GUIDES[p] ? '<a class="quick" href="/help/' + p + '">Quick checks</a>' : '') + '<a class="arrow" href="' + q + '" aria-label="Request help: ' + esc(P[0]) + '">&rarr;</a></div>';
 }).join('\n        ')).join('\n        ');
 
-const countyGrid = (trade, follow) => C.counties.map(c => '<a href="/' + C.trades[trade].slug + '/' + slug(c) + '" data-cov="' + esc(c) + '"' + (follow ? ' data-follow' : '') + '><i class="dot"></i>' + esc(c) + '</a>').join('\n        ');
 const HOW = `<ol class="how">
         <li><span class="n">1</span><b>Pick the service and your ZIP</b><span>Tell us what's wrong. It takes about a minute.</span></li>
         <li><span class="n">2</span><b>Nearby pros say yes</b><span>Each one who's free sends an arrival time and visit fee.</span></li>
@@ -222,98 +220,114 @@ const STORY = `<ol class="story">
 const PRO_TERMS = () => '<ul class="terms">' + (C.freeLaunch ? '<li>Free during our launch, no lead fees</li>' : '<li>First ' + C.freeLeads + ' chosen leads free, then $' + C.leadFee + ' only when a customer picks you</li>') + '<li>No monthly fee or contract</li><li>Only you get the customer\'s details</li></ul>';
 const LEGEND = '<div class="legend" id="legend" hidden><span><i class="dot now"></i>On call now</span><span><i class="dot later"></i>Signed up, off hours now</span><span><i class="dot"></i>Recruiting, you can still ask</span></div>';
 
-// ---- County pages for each trade that is switched on: /hvac/<county>-county-nj, /plumbing/<county>-county-nj ----
-const towns = {};
-Object.keys(ZIPS).sort().forEach(z => { const c = C.counties[ZIPS[z][0]], p = ZIPS[z][1]; (towns[c] = towns[c] || {}); (towns[c][p] = towns[c][p] || []).push(z); });
-
-// Remove pages for trades that have been switched off since the last build.
-Object.keys(C.trades).forEach(t => { if (!LIVE_TRADES.includes(t)) { fs.rmSync(path.join(PUB, C.trades[t].slug), { recursive: true, force: true }); fs.rmSync(path.join(PUB, C.trades[t].slug + '.html'), { force: true }); } });
-
-LIVE_TRADES.forEach(trade => {
-  const T = C.trades[trade], K = COPY[trade], root = '/' + T.slug, first = servicesOf(trade).find(k => C.services[k].live);
-  C.counties.forEach(county => {
-    const p = root + '/' + slug(county), mine = towns[county] || {}, names = Object.keys(mine).sort();
-    const also = LIVE_SVC_PAGES.filter(k => C.services[k].trade === trade).map(k => '<a href="/' + SVC_PAGES[k].slug + '/' + slug(county) + '">' + esc(SVC_PAGES[k].name) + '</a>').join('') +
-      LIVE_TRADES.filter(t => t !== trade).map(t => '<a href="/' + C.trades[t].slug + '/' + slug(county) + '">' + esc(C.trades[t].name) + '</a>').join('');
-    const m = {
-      path: p,
-      title: cap(K.h1) + ' in ' + county + ' County, NJ: See Who Can Come',
-      desc: K.ask + ' Licensed ' + T.pros + ' who cover ' + county + ' County and are free reply with an arrival time and visit fee. Free for homeowners, open 24/7.',
+// ---- Location pages: one index per service (/hvac, /plumbing, /water-heater) and one page per state (/plumbing/texas) ----
+// Each state page lists every county in the state in a searchable finder. Typing a ZIP or tapping a county shows who is
+// signed up there, on the same page, so there's no separate page per county (3,100 near-identical pages would hurt in search).
+const stateSlug = st => slug(GEO.states[st]);
+const STATES = Object.keys(GEO.states).sort((a, b) => GEO.states[a].localeCompare(GEO.states[b]));
+const stateGrid = (root, trade, follow) => '<div class="states"' + (trade ? ' data-trade="' + trade + '"' : '') + '>\n        ' + STATES.map(st => '<a href="' + root + '/' + stateSlug(st) + '" data-state="' + st + '"' + (follow ? ' data-follow="' + stateSlug(st) + '"' : '') + '><i class="dot"></i><b>' + esc(GEO.states[st]) + '</b><span class="n"></span></a>').join('\n        ') + '\n      </div>';
+// What the old county pages were called, so links to them still land somewhere useful.
+const REDIRECTS = [];
+function locationPages(o) {
+  // o: { slug, name, h1, ask, what, who, pros, trade, service, rows(county), extra }
+  const root = '/' + o.slug, T = C.trades[o.trade];
+  fs.rmSync(path.join(PUB, o.slug), { recursive: true, force: true });
+  REDIRECTS.push({ source: root + '/:county(.+)-county-nj', destination: root + '/new-jersey#:county-county', permanent: true });
+  STATES.forEach(st => {
+    const name = GEO.states[st], list = GEO.counties[st], p = root + '/' + stateSlug(st);
+    const others = [].concat(LIVE_TRADES.filter(t => C.trades[t].slug !== o.slug).map(t => [C.trades[t].slug, C.trades[t].name]), LIVE_SVC_PAGES.filter(k => SVC_PAGES[k].slug !== o.slug).map(k => [SVC_PAGES[k].slug, SVC_PAGES[k].name]));
+    const kinds = [...new Set(list.map(c => (c.match(/ (County|Parish|Borough|Census Area|Municipality|city)$/i) || [, 'area'])[1].toLowerCase()))];
+    const unit = kinds[0] === 'parish' ? 'parishes' : kinds[0] === 'county' ? 'counties' : 'areas';
+    write(o.slug + '/' + stateSlug(st) + '.html', shell({
+      path: p, title: cap(o.h1) + ' in ' + name,
+      desc: o.ask + ' Licensed ' + o.pros + ' in ' + name + ' who are free reply with an arrival time and visit fee. Check any of ' + list.length + ' ' + unit + ' by name or ZIP. Free for homeowners, open 24/7.',
       ld: [
-        { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency ' + K.what, name: K.h1 + ' in ' + county + ' County, NJ', provider: org(), areaServed: { '@type': 'AdministrativeArea', name: county + ' County, New Jersey' } },
-        crumbsLd([['Home', '/'], [T.name, root], [county + ' County']])
+        { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency ' + o.what, name: o.h1 + ' in ' + name, provider: org(), areaServed: { '@type': 'State', name: name } },
+        crumbsLd([['Home', '/'], [o.name, root], [name]])
       ]
-    };
-    write(T.slug + '/' + slug(county) + '.html', shell(m, `  <section class="hero sm">
+    }, `  <section class="hero sm">
     <div class="wrap">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${root}">${esc(T.name)}</a> / ${esc(county)} County</nav>
-      <h1>${esc(K.h1)} in ${esc(county)} County, NJ</h1>
-      <p class="lede">${esc(K.ask)} Tell us what's wrong. Licensed ${esc(T.pros)} who cover ${esc(county)} County and are free reply with an arrival time and visit fee. You pick one.</p>
-      ${bookBar({ county, service: first })}
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${root}">${esc(o.name)}</a> / ${esc(name)}</nav>
+      <h1>${esc(o.h1)} in ${esc(name)}</h1>
+      <p class="lede">${esc(o.ask)} Tell us what's wrong. Licensed ${esc(o.pros)} near you who are free reply with an arrival time and visit fee. You pick one.</p>
+      ${bookBar({ service: o.service })}
     </div>
   </section>
   <section class="sec">
-    <div class="wrap two">
-      <div class="stack">
-        <h2>${esc(cap(T.pros))} in ${esc(county)} County</h2>
-        <div class="stack" data-county-pros="${esc(county)}" data-trade="${trade}"><p class="sub">Checking who's signed up...</p></div>
-        <p class="sub">Run ${/^[aeiou]/i.test(K.who) ? 'an' : 'a'} ${esc(K.who)} in ${esc(county)} County? <a href="/contractors">Apply to get emergency requests here.</a></p>
-        ${also ? '<p class="also"><span class="sub">Also in ' + esc(county) + ' County:</span>' + also + '</p>' : ''}
+    <div class="wrap">
+      <h2>Who's on call in ${esc(name)}</h2>
+      <p class="sub">Type your ZIP code or ${unit === 'parishes' ? 'parish' : 'county'}, or pick from the list, to see which ${esc(o.pros)} are signed up there.</p>
+      <div class="finder" data-finder data-st="${st}" data-trade="${o.trade}" data-service="${o.service}">
+        <div class="finder-top"><label class="vh" for="fq">ZIP code or county</label><input type="search" id="fq" data-q placeholder="ZIP code or ${unit === 'parishes' ? 'parish' : 'county'} name" autocomplete="off">${LEGEND}</div>
+        <div class="card" data-panel hidden></div>
+        <p class="notice warn" data-empty hidden></p>
+        <ul class="clist">
+          ${list.map(c => '<li><a href="/request?s=' + o.service + '&amp;county=' + encodeURIComponent(c + ', ' + st) + '" id="' + slug(c) + '" data-cov="' + esc(c + ', ' + st) + '"><i class="dot"></i>' + esc(c) + '</a></li>').join('\n          ')}
+        </ul>
       </div>
-      <div class="stack">
-        <h2>Towns we cover</h2>
-        <p class="sub">Every ${esc(county)} County ZIP code can send a request.</p>
-        <ul class="towns">${names.map(n => '<li>' + esc(n) + ' <span>' + mine[n].join(', ') + '</span></li>').join('')}</ul>
-      </div>
+      <p class="sub">${list.length} ${unit} in ${esc(name)}. No dot next to yours? You can still <a href="/request?s=${o.service}">send a request</a>, and we'll tell you right away what we can do. Run ${/^[aeiou]/i.test(o.who) ? 'an' : 'a'} ${esc(o.who)} in ${esc(name)}? <a href="/contractors">Apply to get emergency requests here.</a></p>
     </div>
   </section>
   <section class="sec">
     <div class="wrap">
       <h2>What's wrong?</h2>
       <div class="rows">
-        ${problemRows(trade, county)}
+        ${o.rows('')}
       </div>
     </div>
   </section>
-  <section class="sec">
+${o.extra || ''}  <section class="sec">
     <div class="wrap">
       <h2>How it works</h2>
       ${HOW}
-      <p class="sub" style="margin-top:20px">No one free within ${C.windowMin} minutes? We say so and show ${esc(T.pros)} you can call directly.</p>
+      <p class="sub" style="margin-top:20px">No one free within ${C.windowMin} minutes? We say so and show ${esc(o.pros)} you can call directly.</p>
+      ${others.length ? '<p class="also"><span class="sub">Also in ' + esc(name) + ':</span>' + others.map(x => '<a href="/' + x[0] + '/' + stateSlug(st) + '">' + esc(x[1]) + '</a>').join('') + '</p>' : ''}
     </div>
   </section>`, { bodyClass: 'inner', sticky: true }));
   });
-
-  // The trade's index: /hvac, /plumbing
-  write(T.slug + '.html', shell({
-    path: root, title: cap(K.h1) + ' by County in New Jersey',
-    desc: 'See where licensed ' + T.pros + ' are taking emergency requests right now, in all 21 New Jersey counties.',
-    ld: [crumbsLd([['Home', '/'], [T.name]])]
+  // The index: every state, lit up where pros are signed up.
+  write(o.slug + '.html', shell({
+    path: root, title: cap(o.h1) + ' Near You, by State',
+    desc: o.ask + ' See where licensed ' + o.pros + ' are taking emergency requests right now, in all 50 states and DC.',
+    ld: [crumbsLd([['Home', '/'], [o.name]])]
   }, `  <section class="hero sm">
     <div class="wrap">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / ${esc(T.name)}</nav>
-      <h1>${esc(K.h1)} across New Jersey</h1>
-      <p class="lede">We're adding licensed ${esc(T.pros)} county by county. This page shows where they're on call right now.</p>
+      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / ${esc(o.name)}</nav>
+      <h1>${esc(o.h1)} near you</h1>
+      <p class="lede">${esc(o.ask)} Send a request now and licensed ${esc(o.pros)} nearby answer with a time and a price. Or pick your state to see who's on call.</p>
+      ${bookBar({ service: o.service })}
     </div>
   </section>
   <section class="sec">
     <div class="wrap">
+      <h2>Pick your state</h2>
       ${LEGEND}
-      <div class="counties" data-trade="${trade}">
-        ${countyGrid(trade)}
-      </div>
-      <p class="sub" style="margin-top:20px">Don't see your county lit up? <a href="/request?s=${first}">Send a request anyway</a> and we'll tell you right away what we can do.</p>
+      ${stateGrid(root, o.trade)}
+      <p class="sub" style="margin-top:20px">Your state not lit up yet? <a href="/request?s=${o.service}">Send a request anyway</a> and we'll tell you right away what we can do.</p>
     </div>
-  </section>`));
-});
+  </section>
+  <section class="sec">
+    <div class="wrap">
+      <h2>What's wrong?</h2>
+      <div class="rows">
+        ${o.rows('')}
+      </div>
+    </div>
+  </section>`, { sticky: true }));
+}
 
-// ---- Service county pages: /water-heater/<county>-county-nj and the /water-heater index ----
-// Same booking flow as the trade pages, with what to do first for that service. Live coverage uses the trade's pros.
+// Remove pages for trades and services that have been switched off since the last build.
+Object.keys(C.trades).forEach(t => { if (!LIVE_TRADES.includes(t)) { fs.rmSync(path.join(PUB, C.trades[t].slug), { recursive: true, force: true }); fs.rmSync(path.join(PUB, C.trades[t].slug + '.html'), { force: true }); } });
 Object.keys(SVC_PAGES).filter(k => !LIVE_SVC_PAGES.includes(k)).forEach(k => { fs.rmSync(path.join(PUB, SVC_PAGES[k].slug), { recursive: true, force: true }); fs.rmSync(path.join(PUB, SVC_PAGES[k].slug + '.html'), { force: true }); });
+
+LIVE_TRADES.forEach(trade => {
+  const T = C.trades[trade], K = COPY[trade];
+  locationPages({ slug: T.slug, name: T.name, h1: K.h1, ask: K.ask, what: K.what, who: K.who, pros: T.pros, trade, service: servicesOf(trade).find(k => C.services[k].live), rows: county => problemRows(trade, county) });
+});
 LIVE_SVC_PAGES.forEach(k => {
-  const S = SVC_PAGES[k], root = '/' + S.slug, trade = C.services[k].trade, T = C.trades[trade];
+  const S = SVC_PAGES[k], trade = C.services[k].trade;
   const probs = problemsOf(k).filter(p => p !== 'other' && C.problems[p][2][0] === k);
-  const rowsFor = county => probs.map(p => {
+  const rows = county => probs.map(p => {
     const P = C.problems[p], q = '/request?s=' + k + '&amp;p=' + p + (county ? '&amp;county=' + encodeURIComponent(county) : '');
     return '<div class="r"><a class="main" href="' + q + '"><b>' + esc(P[0]) + '</b><span>' + esc(P[1]) + '</span></a>' + (GUIDES[p] ? '<a class="quick" href="/help/' + p + '">Quick checks</a>' : '') + '<a class="arrow" href="' + q + '" aria-label="Request help: ' + esc(P[0]) + '">&rarr;</a></div>';
   }).join('\n        ');
@@ -322,35 +336,8 @@ LIVE_SVC_PAGES.forEach(k => {
     const t = TRIAGE.problems[p];
     return '<div class="card"><h3>' + esc(C.problems[p][0]) + '</h3><p class="sub"><b>Call now if:</b> ' + esc(t.now.join(' ')) + '</p><p class="sub"><b>Usually can wait:</b> ' + esc(t.wait) + '</p><p class="sub"><b>First:</b> ' + esc(t.first.join(' ')) + '</p></div>';
   }).join('');
-  C.counties.forEach(county => {
-    const p = root + '/' + slug(county), mine = towns[county] || {}, names = Object.keys(mine).sort();
-    const near = (C.neighbors[county] || []).map(n => '<a href="' + root + '/' + slug(n) + '">' + esc(n) + '</a>').join('');
-    const m = {
-      path: p,
-      title: cap(S.h1) + ' in ' + county + ' County, NJ: See Who Can Come',
-      desc: S.ask + ' Licensed pros who cover ' + county + ' County and are free reply with an arrival time and visit fee. Free for homeowners, open 24/7.',
-      ld: [
-        { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency ' + S.what, name: S.h1 + ' in ' + county + ' County, NJ', provider: org(), areaServed: { '@type': 'AdministrativeArea', name: county + ' County, New Jersey' } },
-        crumbsLd([['Home', '/'], [S.name, root], [county + ' County']])
-      ]
-    };
-    write(S.slug + '/' + slug(county) + '.html', shell(m, `  <section class="hero sm">
-    <div class="wrap">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / <a href="${root}">${esc(S.name)}</a> / ${esc(county)} County</nav>
-      <h1>${esc(S.h1)} in ${esc(county)} County, NJ</h1>
-      <p class="lede">${esc(S.ask)} Tell us what's going on. Licensed pros who cover ${esc(county)} County and are free reply with an arrival time and visit fee. You pick one.</p>
-      ${bookBar({ county, service: k })}
-    </div>
-  </section>
-  <section class="sec">
-    <div class="wrap">
-      <h2>What's wrong with the water heater?</h2>
-      <div class="rows">
-        ${rowsFor(county)}
-      </div>
-    </div>
-  </section>
-  <section class="sec">
+  locationPages({ slug: S.slug, name: S.name, h1: S.h1, ask: S.ask, what: S.what, who: S.who, pros: S.pros, trade, service: k, rows,
+    extra: `  <section class="sec">
     <div class="wrap">
       <h2>Before the pro arrives</h2>
       <p class="sub">What can't wait, what usually can, and what to do first. If you smell gas, leave the house and call 911 or your gas utility from outside.</p>
@@ -358,59 +345,15 @@ LIVE_SVC_PAGES.forEach(k => {
       <p class="sub">Helpful to have ready: whether the tank is gas or electric, its size in gallons, and the brand and age from the label.</p>
     </div>
   </section>
-  <section class="sec">
-    <div class="wrap two">
-      <div class="stack">
-        <h2>Pros in ${esc(county)} County</h2>
-        <div class="stack" data-county-pros="${esc(county)}" data-trade="${trade}"><p class="sub">Checking who's signed up...</p></div>
-        <p class="sub">Run a ${esc(S.who)} in ${esc(county)} County? <a href="/contractors">Apply to get emergency requests here.</a></p>
-        <p class="also"><span class="sub">Also in ${esc(county)} County:</span><a href="/${T.slug}/${slug(county)}">${esc(T.name)}</a>${LIVE_TRADES.filter(t => t !== trade).map(t => '<a href="/' + C.trades[t].slug + '/' + slug(county) + '">' + esc(C.trades[t].name) + '</a>').join('')}</p>
-        ${near ? '<p class="also"><span class="sub">Nearby counties:</span>' + near + '</p>' : ''}
-      </div>
-      <div class="stack">
-        <h2>Towns we cover</h2>
-        <p class="sub">Every ${esc(county)} County ZIP code can send a request.</p>
-        <ul class="towns">${names.map(n => '<li>' + esc(n) + ' <span>' + mine[n].join(', ') + '</span></li>').join('')}</ul>
-      </div>
-    </div>
-  </section>
-  <section class="sec">
-    <div class="wrap">
-      <h2>How it works</h2>
-      ${HOW}
-      <p class="sub" style="margin-top:20px">No one free within ${C.windowMin} minutes? We say so and show pros you can call directly.</p>
-    </div>
-  </section>`, { bodyClass: 'inner', sticky: true }));
-  });
-  write(S.slug + '.html', shell({
-    path: root, title: cap(S.h1) + ' by County in New Jersey',
-    desc: S.ask + ' See where licensed pros are taking emergency water heater requests right now, in all 21 New Jersey counties.',
-    ld: [crumbsLd([['Home', '/'], [S.name]])]
-  }, `  <section class="hero sm">
-    <div class="wrap">
-      <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> / ${esc(S.name)}</nav>
-      <h1>${esc(S.h1)} across New Jersey</h1>
-      <p class="lede">${esc(S.ask)} Pick your county to see who's on call, or send a request now and licensed pros nearby answer with a time and a price.</p>
-    </div>
-  </section>
-  <section class="sec">
-    <div class="wrap">
-      ${LEGEND}
-      <div class="counties" data-trade="${trade}">
-        ${C.counties.map(c => '<a href="' + root + '/' + slug(c) + '" data-cov="' + esc(c) + '"><i class="dot"></i>' + esc(c) + '</a>').join('\n        ')}
-      </div>
-      <p class="sub" style="margin-top:20px">Don't see your county lit up? <a href="/request?s=${k}">Send a request anyway</a> and we'll tell you right away what we can do.</p>
-    </div>
-  </section>
-  <section class="sec">
-    <div class="wrap">
-      <h2>What's wrong with the water heater?</h2>
-      <div class="rows">
-        ${rowsFor('')}
-      </div>
-    </div>
-  </section>`));
+` });
 });
+// Old New Jersey county links go to the New Jersey page, opened at that county. Kept in vercel.json.
+(function () {
+  const f = path.join(__dirname, '..', 'vercel.json'), v = JSON.parse(fs.readFileSync(f, 'utf8'));
+  v.redirects = REDIRECTS;
+  const out = JSON.stringify(v, null, 2) + '\n';
+  if (out !== fs.readFileSync(f, 'utf8')) fs.writeFileSync(f, out);
+})();
 
 // ---- The "What's wrong?" guide: /whats-wrong ----
 // Every live problem, grouped by where it happens in the house, with when it can't wait and what to do first.
@@ -439,7 +382,7 @@ LIVE_SVC_PAGES.forEach(k => {
   };
   const toc = TRIAGE.areas.filter(a => live.some(p => TRIAGE.problems[p].area === a.key)).map(a => '<li><b><a href="#' + a.key + '">' + esc(a.name) + '</a></b><ul>' + live.filter(p => TRIAGE.problems[p].area === a.key).map(p => '<li><a href="#' + p + '" data-k="' + p + '"><b>' + esc(C.problems[p][0]) + '</b></a></li>').join('') + '</ul></li>').join('');
   write('whats-wrong.html', shell({
-    path: '/whats-wrong', title: "What's Wrong? A Room-by-Room Guide to Home Repair Emergencies",
+    path: '/whats-wrong', title: "What's Wrong? Home Repair Emergencies, Room by Room",
     desc: 'No heat, a burst pipe, a leaking water heater, or a sump pump that stopped? Find the problem by where it is in the house, see if it can wait, and what to do first.',
     ld: [
       Object.assign({ '@context': 'https://schema.org', '@type': 'Article', headline: "What's wrong? A room-by-room guide to home repair emergencies", author: org(), publisher: org() }, base ? { mainEntityOfPage: abs('/whats-wrong') } : {}),
@@ -467,7 +410,7 @@ ${TRIAGE.areas.map(section).join('\n')}
   <section class="sec">
     <div class="wrap">
       <h2>Need someone now?</h2>
-      <p class="lede" style="margin-bottom:16px">Licensed New Jersey pros who are free reply with an arrival time and visit fee. Free for homeowners.</p>
+      <p class="lede" style="margin-bottom:16px">Licensed local pros who are free reply with an arrival time and visit fee. Free for homeowners.</p>
       ${bookBar({}).replace('class="book"', 'class="book solo"')}
       <p class="small sub" style="margin-top:16px">This guide is general information, not a diagnosis. If anything seems unsafe, stop and call a licensed professional.</p>
     </div>
@@ -510,7 +453,7 @@ GKEYS.forEach(k => {
   <section class="sec">
     <div class="wrap">
       <h2>Still not working? See who can come.</h2>
-      <p class="lede" style="margin-bottom:16px">Licensed New Jersey pros who are free reply with an arrival time and visit fee. Free for homeowners.</p>
+      <p class="lede" style="margin-bottom:16px">Licensed local pros who are free reply with an arrival time and visit fee. Free for homeowners.</p>
       ${bookBar({ problem: k, service: C.problems[k][2][0] }).replace('class="book"', 'class="book solo"')}
       <p class="also" style="margin-top:24px"><span class="sub">Other quick checks:</span>${others}</p>
     </div>
@@ -538,9 +481,9 @@ write('help.html', shell({
 
 // ---- Hand-written pages: stamp the shared head, brand, and home page blocks ----
 const PAGES = {
-  'index.html': { path: '/', title: 'Emergency Home Repair in New Jersey, 24/7: See Who Can Come Now', desc: 'Home emergency? Pick ' + LIVE_NAMES + ', and licensed New Jersey pros who are free reply with an arrival time and visit fee. You choose. Free for homeowners.' },
-  'contractors.html': { path: '/contractors', title: C.freeLaunch ? 'Free Emergency Repair Leads in New Jersey for Licensed Pros' : 'Emergency Repair Leads in New Jersey: Pay Only When Chosen', desc: 'HVAC, plumbing, electrical, and appliance pros: get emergency requests in the New Jersey counties and hours you choose. ' + (C.freeLaunch ? 'Free during our launch: no lead fees, no monthly fee.' : 'First ' + C.freeLeads + ' chosen leads free, then $' + C.leadFee + ' only when a customer picks you. No monthly fee.') },
-  'request.html': { path: '/request', title: 'Request Emergency Home Repair in New Jersey', desc: 'Tell us what\'s wrong and we\'ll alert licensed New Jersey pros who can come. Takes about a minute.' },
+  'index.html': { path: '/', title: 'Emergency Home Repair Near You, Open 24/7', desc: 'Home emergency? Pick ' + LIVE_NAMES + ', and licensed local pros who are free reply with an arrival time and visit fee. You choose. Free for homeowners.' },
+  'contractors.html': { path: '/contractors', title: C.freeLaunch ? 'Free Emergency Repair Leads for Licensed Local Pros' : 'Emergency Repair Leads: Pay Only When Chosen', desc: 'HVAC, plumbing, electrical, and appliance pros: get emergency requests in the counties and hours you choose. ' + (C.freeLaunch ? 'Free during our launch: no lead fees, no monthly fee.' : 'First ' + C.freeLeads + ' chosen leads free, then $' + C.leadFee + ' only when a customer picks you. No monthly fee.') },
+  'request.html': { path: '/request', title: 'Request Emergency Home Repair', desc: 'Tell us what\'s wrong and we\'ll alert licensed local pros who can come. Takes about a minute.' },
   'status.html': { title: 'Your request', noindex: true },
   'respond.html': { title: 'Job request', noindex: true },
   'terms.html': { title: 'Terms', noindex: true },
@@ -564,7 +507,7 @@ Object.keys(PAGES).forEach(file => {
   if (file === 'index.html') {
     html = block(html, 'book', '      ' + bookBar({ liveOnly: true }));
     html = block(html, 'services', '      ' + houseSection());
-    html = block(html, 'counties', '        ' + countyGrid(LIVE_TRADES[0], true));
+    html = block(html, 'counties', '      ' + stateGrid('/' + C.trades[LIVE_TRADES[0]].slug, '', true));
     html = block(html, 'how', '      ' + STORY);
     html = block(html, 'proterms', '        ' + PRO_TERMS());
     const soon = SERVICES.filter(k => !C.services[k].live).map(k => C.services[k].name.toLowerCase());
@@ -575,7 +518,7 @@ Object.keys(PAGES).forEach(file => {
     html.replace(/<details><summary>([\s\S]*?)<\/summary><p[^>]*>([\s\S]*?)<\/p><\/details>/g, (_, q, a) => { faq.push({ '@type': 'Question', name: q.replace(/<[^>]+>/g, '').trim(), acceptedAnswer: { '@type': 'Answer', text: a.replace(/<[^>]+>/g, '').trim() } }); });
     m.ld = [
       Object.assign({ '@context': 'https://schema.org' }, org()),
-      { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency home repair', name: 'Emergency ' + LIVE_NAMES + ' repair', provider: org(), areaServed: { '@type': 'State', name: 'New Jersey' }, hoursAvailable: { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], opens: '00:00', closes: '23:59' } },
+      { '@context': 'https://schema.org', '@type': 'Service', serviceType: 'Emergency home repair', name: 'Emergency ' + LIVE_NAMES + ' repair', provider: org(), areaServed: { '@type': 'Country', name: 'United States' }, hoursAvailable: { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], opens: '00:00', closes: '23:59' } },
       { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq }
     ];
   }
@@ -585,17 +528,20 @@ Object.keys(PAGES).forEach(file => {
 });
 
 // ---- ZIP lookup for the browser, robots.txt, sitemap.xml ----
-write('assets/nj-zips.js', '// New Jersey ZIP codes: [county index in SITE.counties, place name]. Data from GeoNames (geonames.org), CC BY 4.0.\nwindow.NJ_ZIPS=' + JSON.stringify(ZIPS) + ';\n');
 write('robots.txt', 'User-agent: *\nDisallow: /api/\nDisallow: /status\nDisallow: /respond\nDisallow: /pro\nDisallow: /admin\nDisallow: /unsubscribe\n' + (base ? 'Sitemap: ' + abs('/sitemap.xml') + '\n' : ''));
 if (base) write('sitemap.xml', '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + sitemap.sort().map(p => '  <url><loc>' + abs(p) + '</loc></url>').join('\n') + '\n</urlset>\n');
 else if (fs.existsSync(path.join(PUB, 'sitemap.xml'))) fs.unlinkSync(path.join(PUB, 'sitemap.xml'));
+
+// First steps for each problem, for the request status page ("While you wait, do this first"). From scripts/triage.js.
+fs.writeFileSync(path.join(PUB, 'assets', 'first-steps.js'), '// Built from scripts/triage.js by npm run build. Edit the wording there.\nwindow.FIRST_STEPS = ' +
+  JSON.stringify(Object.fromEntries(Object.keys(TRIAGE.problems).filter(p => C.problems[p]).map(p => [p, { first: TRIAGE.problems[p].first, guide: !!GUIDES[p] }]))) + ';\n');
 
 // Cache busting: stamp each page's links to the shared styles and scripts with a short fingerprint of the file,
 // like /assets/styles.css?v=3f9a1c2b. Browsers may keep these files for a while (see vercel.json), so a changed file
 // must get a new address or visitors would see old styles. Runs on every build, so just run npm run build before pushing.
 (function () {
   const crypto = require('crypto');
-  const names = ['styles.css', 'site.js', 'config.js', 'nj-zips.js'];
+  const names = ['styles.css', 'site.js', 'config.js', 'geo.js', 'first-steps.js'];
   const v = Object.fromEntries(names.map(n => [n, crypto.createHash('sha1').update(fs.readFileSync(path.join(PUB, 'assets', n))).digest('hex').slice(0, 8)]));
   const re = new RegExp('"/assets/(' + names.map(n => n.replace('.', '\\.')).join('|') + ')(\\?v=[0-9a-f]*)?"', 'g');
   const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).forEach(e => {

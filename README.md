@@ -39,12 +39,12 @@ Homeowners request emergency help (heating, cooling, plumbing, water heaters, an
 
 ## Search and marketing
 
-- **Generated pages:** the county pages, guides, `robots.txt`, `sitemap.xml`, and the title, description, share, and structured-data tags on every page come from `npm run build`. Run it after changing `public/assets/config.js` or `scripts/content.js`, then commit the result. Vercel needs no build step.
+- **Generated pages:** the state pages, guides, `robots.txt`, `sitemap.xml`, and the title, description, share, and structured-data tags on every page come from `npm run build`. Run it after changing `public/assets/config.js` or `scripts/content.js`, then commit the result. Vercel needs no build step.
 - **Before launch:** set `brand` and `siteUrl` in `public/assets/config.js` and run `npm run build`. Without `siteUrl` there is no sitemap and no canonical links. Then submit `/sitemap.xml` in Google Search Console.
 - **Guide wording:** edit `scripts/content.js`.
 - **Tracking where requests come from:** give each referral partner a link like `https://yoursite.com/?ref=agent-smith`. Ad links with `utm_source` work too. The source is saved in the `source` column on `requests` and `contractors` and shown in your admin emails. If you created the database before this was added, run `supabase/schema.sql` again; it is safe to rerun.
 - **Page views:** turn on Web Analytics for the project in Vercel. To remove it, set `analytics: ''` in the config.
-- **ZIP codes:** `scripts/nj-zips.json` comes from GeoNames (geonames.org), CC BY 4.0. The footer credit satisfies the license, so keep it.
+- **Places:** `lib/geo-data/` (which county each ZIP is in, and which counties touch) and `public/assets/geo.js` (every state and county) were built once from public US Census data by `scripts/make-geo.js`. You don't need to rerun it.
 
 ## Try it locally without any accounts
 
@@ -82,6 +82,31 @@ how many counties have live pros. "Prove it works" sends a real test email, a te
 - STOP and HELP replies are handled by Twilio's messaging service. If a text fails because the person replied STOP or the number isn't a mobile, the site turns texts off for that pro and shows why on their settings page.
 - Run `supabase/schema.sql` again to add the new columns.
 
+## Nationwide
+
+The site takes requests and pro sign-ups from all 50 states and DC.
+
+- **Counties** are written the same way everywhere, like `Somerset County, NJ` or `Orleans Parish, LA`. A homeowner's county comes from their ZIP code. About 33,000 ZIPs are on file; for one that isn't (new, or PO-box only), the form asks for state and county.
+- **Matching** is still by county and trade. If nobody answers in `widenMin` minutes, pros in the counties that touch it are alerted too, across state lines.
+- **Pages for search:** one page per state per service (`/plumbing/texas`), each with a county finder: type a ZIP or county, or tap one, and it shows who's signed up there without leaving the page. There is no page per county; 3,100 near-identical pages would count against the site. Old New Jersey county links redirect to the New Jersey page.
+- **Licenses** differ by state, and some states license by city or not at all. Pros enter a license number and the state that issued it, or tick "my state or city doesn't license this trade" and explain. You review each one on the admin page, which links to a search for that state's official lookup.
+- **Time zones:** a pro's alert hours and "pause until 7am" follow the time zone of the first county they serve. Times on pages show in the viewer's own time zone.
+- **Recruiting:** the admin page rolls supply up by state, then shows every county in the state you pick. Imported lists are placed by ZIP, or by County plus State.
+- **Moving from the New Jersey-only version:** run `supabase/schema.sql` again. It adds two license columns and converts old county names ("Somerset") to the new form ("Somerset County, NJ"). Safe to run more than once.
+- **Still to do before real launch:** have a lawyer review the terms for all states (contractor-referral, lead-generation, privacy, and texting rules differ), and remember requests only get answers where pros are signed up.
+
+## Error alerts
+
+- If something breaks on the server, the visitor sees a plain "try again" message, the error is saved, and you get an email. The same problem emails you at most once an hour.
+- Script errors on visitors' devices are saved too (never emailed, since browser add-ons cause noise).
+- Both show on the admin page under Launch checklist, "Recent errors", grouped with a count. They're cleared after 30 days.
+- Run `supabase/schema.sql` again to add the `errors` table.
+
+## Email deliverability check
+
+The launch checklist looks up three public DNS records for your `FROM_EMAIL` domain: DKIM (`resend._domainkey`), SPF (`send`), and DMARC (`_dmarc`).
+Anything missing comes with the exact record to add at your domain host. Without them, Gmail and Yahoo tend to put job alerts in spam.
+
 ## Backups
 
 Every Monday the daily job emails you two spreadsheet files: your contractors and your recruiting list. "Download a backup" on the admin page gets the same files anytime.
@@ -110,7 +135,7 @@ If your database was created before this change, run `supabase/schema.sql` again
 
 - **`/admin`** is your page for running the business: applications to approve, requests that had no one to alert, low ratings, every contractor, the latest 100 requests, and lead fees owed (mark paid or waive). It is locked by one key. In Vercel, add an environment variable `ADMIN_KEY` with a long random value (a password manager can make one), redeploy, and type that value into the page. Until `ADMIN_KEY` is set, the page stays locked.
 - **Reviews:** after a homeowner chooses a pro, their request page asks how the visit went (1 to 5, plus "never showed up"). You get an email for each review. A pro's average shows to homeowners once they have `minReviews` reviews (3, set in `config.js`).
-- **Spam limits:** one email or phone can send `limits.perContactHour` requests an hour (3), and one internet connection `limits.perDeviceHour` (6). Change them in `config.js`.
+- **Spam limits:** one email or phone can send `limits.perContactHour` requests an hour (3) and `limits.perContactDay` a day (6); one internet connection `limits.perDeviceHour` requests (6) and `limits.signupsPerDeviceHour` contractor sign-ups (4) an hour. Change them in `config.js`. Refused attempts are listed on the admin page under Launch checklist.
 - **Terms and privacy** are plain-language drafts with blanks in [brackets]. A lawyer needs to review and finish them before launch.
 
 Run `supabase/schema.sql` again after pulling this change. It adds the columns for reviews, fees, and limits and is safe to rerun.
@@ -145,7 +170,7 @@ Run `supabase/schema.sql` again after pulling this. Name and address become opti
 
 - **Alert first, details second.** The request form now needs only ZIP, phone, email, and how soon. Pros are alerted right away. Name, address, notes, and photos are optional on the form. If skipped, the request page asks for name and address while pros answer, or in the same step as choosing. Nobody can be chosen until name and address are in.
 - **Book the first pro automatically.** An optional box on the form: the first pro who says "Within 1 hour" at or under the homeowner's visit-fee limit ($100, $150, $200, or any) is chosen on the spot. It waits for name and address if they're missing, then books the moment they arrive. The email subject says "Booked for you."
-- **Typical answer time.** "Plumbers near you usually answer in about 6 minutes," from the last 60 days. It only shows once a county and trade have 5 requests with a yes (otherwise it falls back to all of New Jersey, or shows nothing). Recomputed at most every 10 minutes. Also returned by `/api/coverage` as `speed`.
+- **Typical answer time.** "Plumbers near you usually answer in about 6 minutes," from the last 60 days. It only shows once a county and trade have 5 requests with a yes (otherwise it falls back to the whole state, or shows nothing). Recomputed at most every 10 minutes. Also returned by `/api/coverage` as `speed`.
 - **Chime when a pro says yes.** "Turn on alerts" on the request page plays a chime, vibrates on Android, and shows a notification if the tab is in the background and the browser allows it. The tab title changes to "(1) A pro can come" either way. Browsers require that tap before any sound, and iPhones only show notifications for sites added to the home screen.
 - **Returning homeowners.** Name, phone, email, address, and ZIP are kept on the device (browser storage, never sent anywhere else) and filled in next time, including the ZIP on the home page. "Not you? Clear" removes them.
 

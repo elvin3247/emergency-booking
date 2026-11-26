@@ -5,7 +5,7 @@ module.exports = {
   'no-heat': {
     title: 'No heat? 7 things to check before you call',
     h1: 'No heat? Check these first',
-    desc: 'Furnace, boiler, or heat pump not heating? Seven safe checks you can do in ten minutes, when to stop, and how to get a licensed New Jersey contractor out fast.',
+    desc: 'Furnace, boiler, or heat pump not heating? Seven safe checks you can do in ten minutes, when to stop, and how to get a licensed local contractor out fast.',
     intro: 'Plenty of no-heat calls end with a dead thermostat battery or a switch someone bumped. These checks take about ten minutes and need no tools.',
     checks: [
       ['Check the thermostat', 'Set it to Heat and a few degrees above the room temperature. If the screen is blank or dim, replace the batteries.'],
@@ -22,7 +22,7 @@ module.exports = {
   'no-cooling': {
     title: 'AC not cooling? 6 things to check before you call',
     h1: 'No cooling? Check these first',
-    desc: 'AC or heat pump running but not cooling, or not running at all? Six safe checks, when to shut it off, and how to get a licensed New Jersey contractor out fast.',
+    desc: 'AC or heat pump running but not cooling, or not running at all? Six safe checks, when to shut it off, and how to get a licensed local contractor out fast.',
     intro: 'Before you pay for a visit, rule out the simple causes. These checks take about ten minutes and need no tools.',
     checks: [
       ['Check the thermostat', 'Set it to Cool and a few degrees below the room temperature. If the screen is blank or dim, replace the batteries.'],
@@ -70,7 +70,7 @@ module.exports = {
   'thermostat': {
     title: 'Thermostat blank or not working? 6 quick fixes',
     h1: 'Thermostat not working? Check these first',
-    desc: 'Blank thermostat screen, or heating and cooling that ignore it? Six quick fixes to try before you call a New Jersey HVAC contractor.',
+    desc: 'Blank thermostat screen, or heating and cooling that ignore it? Six quick fixes to try before you call a local HVAC contractor.',
     intro: 'A blank or unresponsive thermostat is often a power problem somewhere else in the system. These checks take a few minutes.',
     checks: [
       ['Replace the batteries', 'Many thermostats run on AA or AAA batteries behind the faceplate. Swap them even if the screen still shows faintly.'],
@@ -86,7 +86,7 @@ module.exports = {
   'burst-pipe': {
     title: 'Burst or leaking pipe? What to do in the first 5 minutes',
     h1: 'Burst or leaking pipe? Do this first',
-    desc: 'Water spraying or dripping from a pipe, ceiling, or wall: how to shut the water off, limit the damage, and get a licensed New Jersey plumber out fast.',
+    desc: 'Water spraying or dripping from a pipe, ceiling, or wall: how to shut the water off, limit the damage, and get a licensed local plumber out fast.',
     intro: 'The first few minutes matter most. Stopping the water comes before anything else, and you can do it without tools.',
     danger: 'Water near outlets, the electrical panel, or a sagging ceiling?',
     checks: [
@@ -103,7 +103,7 @@ module.exports = {
   'clog': {
     title: 'Clogged drain or sewer backup? 5 things to check first',
     h1: 'Clogged drain or backup? Check these first',
-    desc: 'Sink, tub, or toilet backing up? Five safe checks that tell you whether it is one drain or the main line, and when to call a licensed New Jersey plumber.',
+    desc: 'Sink, tub, or toilet backing up? Five safe checks that tell you whether it is one drain or the main line, and when to call a licensed local plumber.',
     intro: 'One slow drain is usually a small job. Water coming up in several places at once means the main line, and that needs a plumber.',
     danger: 'Sewage backing up near outlets or appliances?',
     checks: [
@@ -119,7 +119,7 @@ module.exports = {
   'no-hot-water': {
     title: 'No hot water? 6 things to check before you call',
     h1: 'No hot water? Check these first',
-    desc: 'Water heater not heating, or running out fast? Six safe checks for gas and electric tanks, and when to call a licensed New Jersey plumber.',
+    desc: 'Water heater not heating, or running out fast? Six safe checks for gas and electric tanks, and when to call a licensed local plumber.',
     intro: 'A tripped breaker or a pilot light that went out causes many no-hot-water calls. These checks take a few minutes and need no tools.',
     checks: [
       ['Check more than one faucet', 'If only one faucet runs cold, the problem is at that fixture, not the water heater.'],
@@ -135,7 +135,7 @@ module.exports = {
   'toilet': {
     title: 'Toilet overflowing or running? What to do right now',
     h1: 'Toilet overflowing or running? Do this first',
-    desc: 'Stop an overflowing toilet in seconds, then five safe checks for a toilet that runs, will not flush, or keeps clogging, and when to call a licensed New Jersey plumber.',
+    desc: 'Stop an overflowing toilet in seconds, then five safe checks for a toilet that runs, will not flush, or keeps clogging, and when to call a licensed local plumber.',
     intro: 'An overflowing toilet is scary, but you can stop the water in a few seconds. Most running or weak-flush problems are a flapper, a chain, or a float you can see under the tank lid.',
     checks: [
       ['Stop the water', 'Turn the shutoff valve on the wall behind the toilet clockwise until it stops. No valve, or it will not turn? Lift the tank lid and pull the float up to stop the fill.'],
@@ -151,7 +151,7 @@ module.exports = {
   'sump': {
     title: 'Sump pump not working? 6 checks before water rises',
     h1: 'Sump pump not working? Check these first',
-    desc: 'Water rising in the sump pit or the basement? Six safe checks for a sump pump that will not run or keeps running, and when to call a licensed New Jersey plumber fast.',
+    desc: 'Water rising in the sump pit or the basement? Six safe checks for a sump pump that will not run or keeps running, and when to call a licensed local plumber fast.',
     intro: 'When it is raining, a stopped sump pump is urgent. Many failures are a tripped outlet or a stuck float switch, which you can check in a few minutes without tools.',
     checks: [
       ['Stay out of standing water', 'If water has reached outlets, cords, or the furnace, do not step in it. Shut off power to the basement at the panel only if you can reach it from a dry spot, or wait for a pro.'],
@@ -167,7 +167,7 @@ module.exports = {
   'wh-leak': {
     title: 'Water heater leaking? What to shut off and when to call',
     h1: 'Water heater leaking? Do this first',
-    desc: 'Water under or around your water heater? How to shut off the water and power safely, how to tell a small drip from a failing tank, and when to call a licensed New Jersey plumber.',
+    desc: 'Water under or around your water heater? How to shut off the water and power safely, how to tell a small drip from a failing tank, and when to call a licensed local plumber.',
     intro: 'Not every puddle near a water heater means the tank is done. But a tank leaking from the bottom is failing, so it is worth shutting things off now and finding out.',
     checks: [
       ['Shut the cold water valve', 'Find the pipe going into the top of the tank marked cold. Turn its valve clockwise, or turn a lever handle so it sits across the pipe. This stops more water from entering.'],

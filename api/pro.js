@@ -4,7 +4,8 @@ const C = require('../lib/config');
 const store = require('../lib/store');
 const sms = require('../lib/sms');
 const E = require('../lib/emails');
-const { wrap, bad, str, digits, isEmail, withinHours, pauseUntil, isReady, isPaused, openedAt } = require('../lib/http');
+const geo = require('../lib/geo');
+const { zoneOf, wrap, bad, str, digits, isEmail, withinHours, pauseUntil, isReady, isPaused, openedAt } = require('../lib/http');
 
 async function load(t) {
   const c = await store.contractorByManageToken(str(t, 64));
@@ -36,7 +37,7 @@ async function jobs(c) {
 const view = c => ({
   company: c.company, contact: c.contact, email: c.email, status: c.status, counties: c.counties, trades: c.trades || ['hvac'],
   visit_fee: c.visit_fee, business_phone: c.business_phone, alert_hours: c.alert_hours,
-  paused_until: isPaused(c) ? c.paused_until : null, in_hours: withinHours(c.alert_hours),
+  paused_until: isPaused(c) ? c.paused_until : null, in_hours: withinHours(c.alert_hours, new Date(), zoneOf(c)),
   free_leads_left: c.free_leads_left, setup_complete: isReady(c), id: c.id,
   about: c.about || '', years_in_business: c.years_in_business, website: c.website || '', extra_emails: c.extra_emails || [],
   mobile: c.mobile || '', sms_on: !!c.sms_on, sms_off_reason: c.sms_on ? null : c.sms_off_reason || null, sms_ready: sms.on()
@@ -50,7 +51,7 @@ module.exports = wrap({
     const c = await load(body.t);
     if (body.action === 'pause') {
       if (!['morning', 'monday', 'off', 'resume'].includes(body.until)) throw bad('Choose how long to pause.');
-      const until = pauseUntil(body.until);
+      const until = pauseUntil(body.until, new Date(), zoneOf(c));
       return full(await store.updateContractor(c.id, { paused_until: until ? until.toISOString() : null }));
     }
     if (body.action === 'settings') {
@@ -62,7 +63,7 @@ module.exports = wrap({
       p.business_phone = str(body.business_phone, 30);
       if (C.alertHours[body.alert_hours]) p.alert_hours = body.alert_hours;
       if (Array.isArray(body.counties)) {
-        const counties = body.counties.filter(x => C.counties.includes(x));
+        const counties = [...new Set(body.counties.filter(geo.valid))].slice(0, 60);
         if (!counties.length) throw bad('Pick at least one county you serve.');
         p.counties = counties;
       }

@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/styles.css?v=6dd3076e">
+<link rel="stylesheet" href="/assets/styles.css?v=cb0bd0dc">
 <!-- head:end -->
 </head>
 <body>
@@ -21,13 +21,13 @@
 <main class="page"><div class="wrap"><div class="admin" id="app"></div></div></main>
 <div class="toast" id="toast" role="status" hidden></div>
 <div id="site-footer"></div>
-<script src="/assets/config.js?v=041d314b"></script>
-<script src="/assets/site.js?v=ddecd3ee"></script>
-<script src="/assets/nj-zips.js?v=53ee27e0"></script>
+<script src="/assets/config.js?v=918e849e"></script>
+<script src="/assets/site.js?v=c4b7ce98"></script>
+<script src="/assets/geo.js?v=53165009"></script>
 <script>
 // The owner's page: approve contractors, watch requests, and track lead fees. Locked by the ADMIN_KEY you set in Vercel.
 var app = document.getElementById('app'), D = null, tab = 'todo', toastT, editing = null, removing = null;
-var SETUP = null, REC = null, FIL = { trade: '', county: '', stage: 'open', q: '' }, picked = {}, IMPORT = null, NOTE = '';
+var SETUP = null, REC = null, FIL = { trade: '', county: '', state: '', state2: false, stage: 'open', q: '' }, picked = {}, IMPORT = null, NOTE = '', ECO = null;
 var KEY = ''; try { KEY = sessionStorage.getItem('adminKey') || ''; } catch (e) {}
 function toast(m) { var el = document.getElementById('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { el.hidden = true; }, 3500); }
 async function call(body, qs) {
@@ -36,7 +36,7 @@ async function call(body, qs) {
   if (!res.ok) throw Object.assign(new Error(data.error || 'Something went wrong.'), { status: res.status });
   return data;
 }
-var when = function (iso) { return iso ? new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
+var when = function (iso) { return iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
 var money = function (n) { return '$' + Number(n || 0).toLocaleString('en-US'); };
 var tradeNames = function (c) { return c.trades.map(function (t) { return (SITE.trades[t] || { name: t }).name; }).join(', '); };
 var table = function (heads, rows, empty) { return rows.length ? '<div class="tablewrap"><table class="list"><thead><tr>' + heads.map(function (h) { return '<th scope="col">' + h + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' : '<p class="sub">' + empty + '</p>'; };
@@ -58,12 +58,18 @@ var contractorRow = function (c) {
   var acts = (c.status === 'approved' ? '<button class="btn sm ghost" type="button" data-status="paused" data-id="' + c.id + '">Pause</button>'
     : '<button class="btn sm" type="button" data-status="approved" data-id="' + c.id + '">Approve</button>') + '<button class="btn sm ghost" type="button" data-edit="' + c.id + '">Edit</button>';
   return '<tr><td><b>' + esc(c.company) + '</b><br><span class="sub">' + esc(c.contact || '') + ' · ' + esc(c.email) + ' · ' + esc(c.mobile) + '</span><br><span class="sub small">Applied ' + when(c.created_at) + (c.source ? ' · from ' + esc(c.source) : '') + '</span></td>' +
-    '<td>' + esc(tradeNames(c)) + '<br><span class="sub">License ' + esc(c.license) + '</span></td>' +
-    '<td>' + esc(c.counties.join(', ')) + '</td>' +
+    '<td>' + esc(tradeNames(c)) + '<br><span class="sub">' + licLine(c) + '</span></td>' +
+    '<td>' + esc(c.counties.length > 6 ? c.counties.slice(0, 6).join('; ') + ', and ' + (c.counties.length - 6) + ' more' : c.counties.join('; ')) + '</td>' +
     '<td class="num">' + (c.visit_fee == null ? '<span class="sub">Not set</span>' : money(c.visit_fee)) + '<br><span class="sub small">' + esc(SITE.alertHours[c.alert_hours] || '') + '</span></td>' +
     '<td class="num">' + (c.reviews ? c.reviews.avg + ' of 5<br><span class="sub small">' + c.reviews.count + ' review' + (c.reviews.count === 1 ? '' : 's') + '</span>' : '<span class="sub">None yet</span>') + '</td>' +
     '<td class="num">' + (c.owed ? '<b>' + money(c.owed) + '</b>' : '<span class="sub">$0</span>') + '<br><span class="sub small">' + c.free_leads_left + ' free left</span></td>' +
     '<td>' + statusPill(c) + '<div class="acts" style="margin-top:6px">' + acts + '</div></td></tr>';
+};
+// The license as the pro entered it, with a search link to that state's official lookup. Rules differ by state, so you check each by hand.
+var licLine = function (c) {
+  var st = c.license_state || (c.counties[0] || '').slice(-2), name = (window.GEO && GEO.states[st]) || st;
+  var look = ' · <a href="https://www.google.com/search?q=' + encodeURIComponent(name + ' ' + tradeNames(c).split(',')[0] + ' contractor license lookup') + '" target="_blank" rel="noopener">Find ' + esc(name) + '\'s lookup</a>';
+  return c.license ? 'License ' + esc(c.license) + (c.license_state ? ' (' + esc(c.license_state) + ')' : '') + look : '<b>No license given.</b> They say: "' + esc(c.no_license_reason || '') + '"' + look;
 };
 // Edit what a contractor can't change themselves (company, license, trades, counties, business phone).
 var boxes = function (name, all, on, label) { return '<div class="chips">' + all.map(function (k) { return '<label class="chip" for="' + name + k.replace(/\W/g, '') + '"><input type="checkbox" id="' + name + k.replace(/\W/g, '') + '" name="' + name + '" value="' + esc(k) + '"' + (on.indexOf(k) > -1 ? ' checked' : '') + '><span>' + esc(label ? label(k) : k) + '</span></label>'; }).join('') + '</div>'; };
@@ -71,7 +77,7 @@ var editRow = function (c) {
   return '<tr><td colspan="7"><form class="stack" id="editc" data-id="' + c.id + '"><div class="row"><div><label for="ec">Company</label><input type="text" id="ec" value="' + esc(c.company) + '"></div><div><label for="el">License number(s)</label><input type="text" id="el" value="' + esc(c.license) + '"></div></div>' +
     '<div class="row"><div><label for="ep">Business phone</label><input type="tel" id="ep" value="' + esc(c.business_phone || '') + '"></div><div></div></div>' +
     '<div><label>Trades</label>' + boxes('et', Object.keys(SITE.trades), c.trades, function (k) { return SITE.trades[k].name; }) + '</div>' +
-    '<div><label>Counties</label>' + boxes('eco', SITE.counties, c.counties) + '</div>' +
+    '<div><label>Counties</label><div id="eco-pick"></div></div>' +
     '<div class="btns"><button class="btn sm" type="submit">Save</button><button class="btn sm ghost" type="button" data-noedit>Cancel</button></div></form></td></tr>';
 };
 var CHEADS = ['Company', 'Trade and license', 'Counties', 'Visit fee', 'Reviews', 'Owes', 'Status'];
@@ -109,6 +115,12 @@ function setupTab() {
       return '<div class="chk ' + c.state + '"><span class="pill ' + STATE[c.state][0] + '">' + STATE[c.state][1] + '</span><div><b>' + esc(c.label) + '</b><p>' + esc(c.detail) + '</p>' + (c.fix ? '<p class="fix">' + esc(c.fix) + '</p>' : '') + '</div></div>';
     }).join('') + '</div>';
   });
+  // What broke and who hit the spam limits, last 7 days.
+  var KIND = { request: 'Request', signup: 'Contractor sign-up', link: 'Find my request' };
+  if (SETUP.errors && SETUP.errors.length) h += '<h2>Recent errors</h2><p class="sub">Last 7 days, newest first. Server errors are emailed to you the first time, then at most once an hour. Paste a line to Claude to get it fixed.</p>' +
+    table(['Where', 'What happened', 'How often', 'Last'], SETUP.errors.map(function (e) { return '<tr><td><span class="pill ' + (e.kind === 'server' ? 'bad">Server' : 'plain">Visitor\'s device') + '</span><br>' + esc(e.route) + '</td><td>' + esc(e.message) + '</td><td>' + e.count + (e.day ? '<br><span class="sub small">' + e.day + ' today</span>' : '') + '</td><td>' + when(e.last_at) + '</td></tr>'; }), '');
+  if (SETUP.blocked && SETUP.blocked.length) h += '<h2>Refused by the spam limits</h2><p class="sub">Last 7 days. One email or phone can send ' + SETUP.limits.perContactHour + ' requests an hour and ' + SETUP.limits.perContactDay + ' a day; one internet connection ' + SETUP.limits.perDeviceHour + ' an hour. Change these under limits in config.js.</p>' +
+    table(['What', 'Who', 'Times refused', 'Last'], SETUP.blocked.map(function (b) { return '<tr><td>' + esc(KIND[b.kind] || b.kind) + '</td><td>' + esc(b.who) + '</td><td>' + b.count + (b.day ? '<br><span class="sub small">' + b.day + ' today</span>' : '') + '</td><td>' + when(b.last_at) + '</td></tr>'; }), '');
   h += '<h2>Prove it works</h2><p class="sub">Checks can pass while mail still lands in spam. These send real messages so you can see them arrive.</p><div class="testgrid">' +
     '<form class="card" id="t-email"><h3>Send a test email</h3><div><label for="te">To</label><input type="email" id="te" value="' + esc(SETUP.test_to.email) + '"></div><div><button class="btn sm" type="submit">Send test email</button></div></form>' +
     '<form class="card" id="t-text"><h3>Send a test text</h3><div><label for="tt">Mobile number</label><input type="tel" id="tt" placeholder="(908) 555-0123"></div><div><button class="btn sm" type="submit">Send test text</button></div></form>' +
@@ -127,6 +139,7 @@ function shown() {
   return REC.prospects.filter(function (p) {
     if (FIL.trade && p.trades.indexOf(FIL.trade) < 0) return false;
     if (FIL.county && p.counties.indexOf(FIL.county) < 0) return false;
+    if (FIL.state2 && !FIL.county && !p.counties.some(function (c) { return c.slice(-2) === FIL.state; })) return false;
     if (FIL.stage === 'open' && ['new', 'invited', 'clicked'].indexOf(p.stage) < 0) return false;
     if (FIL.stage === 'ready' && p.blocked) return false;
     if (FIL.stage && ['open', 'ready'].indexOf(FIL.stage) < 0 && p.stage !== FIL.stage) return false;
@@ -135,7 +148,7 @@ function shown() {
   });
 }
 function cell(county, t) {
-  var x = REC.supply[county][t], tone = x.live >= 3 ? 'ok' : x.live ? 'thin' : 'none', on = FIL.county === county && FIL.trade === t;
+  var x = (REC.supply[county] || {})[t] || { live: 0, pending: 0, prospects: 0, gaps: 0 }, tone = x.live >= 3 ? 'ok' : x.live ? 'thin' : 'none', on = FIL.county === county && FIL.trade === t;
   return '<td><button type="button" class="cell ' + tone + (on ? ' on' : '') + '" data-cell="' + esc(county) + '|' + t + '" aria-label="' + esc(county) + ', ' + esc(tname(t)) + ': ' + x.live + ' live">' +
     '<b>' + x.live + '</b><span>' + (x.pending ? x.pending + ' waiting, ' : '') + x.prospects + ' to invite' + (x.gaps ? '</span><em>' + x.gaps + ' missed</em>' : '</span>') + '</button></td>';
 }
@@ -143,21 +156,29 @@ function recruitTab() {
   if (!REC) { loadRecruit(); return '<p class="sub">Loading your recruiting list...</p>'; }
   var T = REC.totals, list = shown(), sel = list.filter(function (p) { return picked[p.id]; }), ready = sel.filter(function (p) { return !p.blocked; });
   var h = '<div class="kpis"><div><b>' + T.prospects + '</b><span>companies on your list</span></div><div><b>' + T.invited + '</b><span>invited</span></div><div><b>' + T.clicked + '</b><span>clicked the link</span></div><div><b>' + T.applied + '</b><span>applied</span></div><div><b>' + T.live + '</b><span>now live</span></div></div>';
-  // Supply map
-  h += '<h2>Where you need pros</h2><p class="sub">Live pros in each county, by trade. Aim for at least 3 so every homeowner gets choices. Red means nobody, so requests there go unanswered. Tap a box to see who you can invite there.</p>' +
-    '<div class="tablewrap"><table class="list supply"><thead><tr><th scope="col">County</th>' + REC.trades.map(function (t) { return '<th scope="col">' + esc(tname(t)) + '</th>'; }).join('') + '</tr></thead><tbody>' +
-    SITE.counties.map(function (c) { return '<tr><th scope="row">' + esc(c) + '</th>' + REC.trades.map(function (t) { return cell(c, t); }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' +
+  // Supply: every state where something is happening, then the counties of the state you pick.
+  var sts = Object.keys(REC.states).sort(function (a, b) { return REC.states[b].live - REC.states[a].live || REC.states[b].requests - REC.states[a].requests || (a < b ? -1 : 1); });
+  if (!FIL.state) FIL.state = sts[0] || 'NJ';
+  var stateOpts = Object.keys(GEO.states).sort(function (a, b) { return GEO.states[a] < GEO.states[b] ? -1 : 1; }).map(function (k) { return '<option value="' + k + '"' + (FIL.state === k ? ' selected' : '') + '>' + esc(GEO.states[k]) + (REC.states[k] ? ' (' + REC.states[k].live + ' live)' : '') + '</option>'; }).join('');
+  h += '<h2>Where you need pros</h2><p class="sub">Requests only get answers where pros are signed up, so this is the map that matters. States with pros, companies to invite, or recent requests are listed first.</p>' +
+    (sts.length ? '<div class="tablewrap"><table class="list"><thead><tr><th>State</th><th>Live pros</th><th>Counties with a pro</th><th>Waiting on you</th><th>To invite</th><th>Requests, 30 days</th><th>Missed</th></tr></thead><tbody>' +
+      sts.map(function (k) { var x = REC.states[k]; return '<tr><td><button class="quiet" type="button" data-pickstate="' + k + '"><b>' + esc(GEO.states[k]) + '</b></button></td><td>' + x.live + '</td><td>' + x.covered + ' of ' + x.total + '</td><td>' + x.pending + '</td><td>' + x.prospects + '</td><td>' + x.requests + '</td><td>' + (x.gaps ? '<b style="color:var(--crit)">' + x.gaps + '</b>' : '0') + '</td></tr>'; }).join('') + '</tbody></table></div>'
+      : '<p class="sub">Nothing yet. Once pros apply, you add companies to invite, or requests come in, states show up here.</p>') +
+    '<h3 style="margin-top:20px">County by county</h3><p class="sub">Live pros in each county, by trade. Aim for at least 3 so every homeowner gets choices. Red means nobody. Tap a box to see who you can invite there.</p>' +
+    '<div class="filters"><select id="f-state" aria-label="State">' + stateOpts + '</select></div>' +
+    '<div class="tablewrap" style="max-height:520px;overflow:auto"><table class="list supply"><thead><tr><th scope="col">County</th>' + REC.trades.map(function (t) { return '<th scope="col">' + esc(tname(t)) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    GEO.counties[FIL.state].map(function (c) { var k = c + ', ' + FIL.state; return '<tr><th scope="row">' + esc(c) + '</th>' + REC.trades.map(function (t) { return cell(k, t); }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' +
     '<p class="small sub">"Waiting" = applied but not approved or not set up yet. "Missed" = requests in the last 30 days with nobody to alert.</p>';
   // Add companies
   h += '<h2>Add companies to invite</h2><div class="testgrid">' + importCard() +
     '<form class="card" id="invite"><h3>Invite one after a call</h3><p class="small sub">They get a sign-up link with their email filled in. It\'s added to your list so you can see if they sign up.</p>' +
     '<div class="row"><div><label for="iname">Their name or company</label><input type="text" id="iname"></div><div><label for="iemail">Their email</label><input type="email" id="iemail"></div></div>' +
-    '<div class="row"><div><label for="itrade">Trade</label><select id="itrade">' + REC.trades.map(function (t) { return '<option value="' + t + '">' + esc(tname(t)) + '</option>'; }).join('') + '</select></div><div><label for="icounty">County</label><select id="icounty"><option value="">Not sure</option>' + SITE.counties.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('') + '</select></div></div>' +
+    '<div class="row"><div><label for="itrade">Trade</label><select id="itrade">' + REC.trades.map(function (t) { return '<option value="' + t + '">' + esc(tname(t)) + '</option>'; }).join('') + '</select></div><div><label for="izip">Their ZIP code (optional)</label><input type="text" id="izip" inputmode="numeric" maxlength="5"></div></div>' +
     '<div><button class="btn sm" type="submit">Send invite</button></div></form></div>';
   // The list
   h += '<h2 id="plist">Your list</h2>' +
     '<div class="filters"><select id="f-trade" aria-label="Trade"><option value="">All trades</option>' + Object.keys(SITE.trades).map(function (t) { return '<option value="' + t + '"' + (FIL.trade === t ? ' selected' : '') + '>' + esc(tname(t)) + '</option>'; }).join('') + '</select>' +
-    '<select id="f-county" aria-label="County"><option value="">All counties</option>' + SITE.counties.map(function (c) { return '<option' + (FIL.county === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' +
+    '<select id="f-where" aria-label="Where"><option value="all"' + (!FIL.county && !FIL.state2 ? ' selected' : '') + '>Everywhere</option><option value="state"' + (FIL.state2 && !FIL.county ? ' selected' : '') + '>' + esc(GEO.states[FIL.state]) + ' only</option>' + (FIL.county ? '<option value="county" selected>' + esc(FIL.county) + ' only</option>' : '') + '</select>' +
     '<select id="f-stage" aria-label="Status">' + [['open', 'Not signed up yet'], ['ready', 'Ready to invite now'], ['', 'Everyone'], ['applied', 'Applied'], ['live', 'Live'], ['not_interested', 'Not interested'], ['unsubscribed', 'Asked for no emails']].map(function (o) { return '<option value="' + o[0] + '"' + (FIL.stage === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
     '<input type="search" id="f-q" placeholder="Search name, email, town" value="' + esc(FIL.q) + '" aria-label="Search"></div>';
   if (!REC.can_bulk) h += '<div class="notice warn"><b>Bulk invites are off until you add your mailing address.</b> Set MAILING_ADDRESS in Vercel, or mailingAddress in public/assets/config.js. The law (CAN-SPAM) requires a postal address in emails to companies that haven\'t signed up. A PO box works.</div>';
@@ -184,7 +205,7 @@ async function loadRecruit() {
 
 // ---- Adding a list: paste from a spreadsheet or pick a CSV file. Columns are matched by their names. ----
 var FIELDS = { company: /^(company|business|business name|company name|name|dba)$/, contact: /^(contact|owner|contact name|first name|full name|person)$/, email: /e-?mail/, phone: /phone|mobile|cell|tel/,
-  website: /web|url|site/, license: /licen[cs]e/, town: /^(town|city|municipality|locality)$/, county: /county/, zip: /^(zip|zip code|postal|postal code|zipcode)$/, trade: /trade|category|type|service|industry/, notes: /note|comment/ };
+  website: /web|url|site/, license: /licen[cs]e/, town: /^(town|city|municipality|locality)$/, county: /county/, zip: /^(zip|zip code|postal|postal code|zipcode)$/, state: /^(state|st|province|region)$/, trade: /trade|category|type|service|industry/, notes: /note|comment/ };
 function parseTable(text) {
   text = String(text || '').replace(/^﻿/, '');
   var first = text.split(/\r?\n/)[0] || '', sep = first.split('\t').length > first.split(',').length ? '\t' : ',';
@@ -199,16 +220,6 @@ function parseTable(text) {
   }
   row.push(cur); if (row.some(function (c) { return c.trim(); })) rows.push(row);
   return rows;
-}
-var PLACES = null;
-function countyOf(r) {
-  if (r.county) { var c = r.county.replace(/\s*county\s*$/i, '').trim().toLowerCase(); var hit = SITE.counties.filter(function (x) { return x.toLowerCase() === c; })[0]; if (hit) return hit; }
-  var z = String(r.zip || '').match(/\d{5}/); if (z && window.NJ_ZIPS && NJ_ZIPS[z[0]]) return SITE.counties[NJ_ZIPS[z[0]][0]];
-  if (r.town && window.NJ_ZIPS) {
-    if (!PLACES) { PLACES = {}; Object.keys(NJ_ZIPS).forEach(function (k) { PLACES[NJ_ZIPS[k][1].toLowerCase()] = SITE.counties[NJ_ZIPS[k][0]]; }); }
-    return PLACES[r.town.trim().toLowerCase()] || '';
-  }
-  return '';
 }
 function tradesOf(text) {
   var t = String(text || '').toLowerCase(), out = [];
@@ -231,25 +242,26 @@ function importRows() {
   var m = IMPORT.map, g = function (r, f) { return m[f] == null ? '' : String(r[m[f]] || '').trim(); };
   return IMPORT.rows.map(function (r) {
     var row = { company: g(r, 'company'), contact: g(r, 'contact'), email: g(r, 'email'), phone: g(r, 'phone'), website: g(r, 'website'), license: g(r, 'license'), town: g(r, 'town'), county: g(r, 'county'), zip: g(r, 'zip'), notes: g(r, 'notes') };
-    var tr = tradesOf(g(r, 'trade')), co = countyOf(row);
+    var tr = tradesOf(g(r, 'trade'));
+    // Where they are is worked out on the server: from the ZIP if there is one, otherwise from County plus State.
     return { company: row.company, contact: row.contact, email: row.email, phone: row.phone, website: row.website, license: row.license, town: row.town, notes: row.notes,
-      trades: tr.length ? tr : IMPORT.trade ? [IMPORT.trade] : [], counties: co ? [co] : IMPORT.county ? [IMPORT.county] : [] };
+      zip: row.zip, county: row.county, state: g(r, 'state'), trades: tr.length ? tr : IMPORT.trade ? [IMPORT.trade] : [] };
   });
 }
 function importCard() {
   var h = '<div class="card" id="importer"><h3>Add a list</h3>';
   if (!IMPORT || IMPORT.error) {
-    return h + '<p class="small sub">Paste rows from a spreadsheet, or pick a CSV file. Include a header row. We match columns named like Company, Contact, Email, Phone, Town, County, ZIP, Trade, Website, License, and Notes.</p>' +
-      '<div><label for="imp-text">Paste rows</label><textarea id="imp-text" rows="4" placeholder="Company, Email, Phone, Town&#10;Example Heating, info@example.com, 908-555-0100, Warren"></textarea></div>' +
+    return h + '<p class="small sub">Paste rows from a spreadsheet, or pick a CSV file. Include a header row. We match columns named like Company, Contact, Email, Phone, Town, County, State, ZIP, Trade, Website, License, and Notes. Include a ZIP (or County and State) so we know where each company is.</p>' +
+      '<div><label for="imp-text">Paste rows</label><textarea id="imp-text" rows="4" placeholder="Company, Email, Phone, ZIP&#10;Example Heating, info@example.com, 908-555-0100, 07059"></textarea></div>' +
       '<div class="row"><div><label for="imp-file">Or pick a CSV file</label><input type="file" id="imp-file" accept=".csv,.txt,text/csv"></div><div><label for="imp-name">Name this list (optional)</label><input type="text" id="imp-name" placeholder="Supply house list"></div></div>' +
       (IMPORT && IMPORT.error ? '<p class="err" role="alert">' + esc(IMPORT.error) + '</p>' : '') + '<div><button class="btn sm" type="button" data-prep>Check the list</button></div></div>';
   }
-  var rows = importRows(), noTrade = rows.filter(function (r) { return !r.trades.length; }).length, noCounty = rows.filter(function (r) { return !r.counties.length; }).length;
+  var rows = importRows(), noTrade = rows.filter(function (r) { return !r.trades.length; }).length, noPlace = rows.filter(function (r) { return !/\d{5}/.test(r.zip) && !(r.county && r.state); }).length;
   var found = Object.keys(IMPORT.map).map(function (f) { return f + ' = "' + IMPORT.heads[IMPORT.map[f]].trim() + '"'; }).join(', ');
   h += '<p class="small sub"><b>' + rows.length + ' companies</b> in "' + esc(IMPORT.name) + '". Columns matched: ' + esc(found) + '.</p>' +
     '<div class="row"><div><label for="imp-trade">Trade for rows without one (' + noTrade + ')</label><select id="imp-trade"><option value="">Leave blank</option>' + Object.keys(SITE.trades).map(function (t) { return '<option value="' + t + '"' + (IMPORT.trade === t ? ' selected' : '') + '>' + esc(tname(t)) + '</option>'; }).join('') + '</select></div>' +
-    '<div><label for="imp-county">County for rows without one (' + noCounty + ')</label><select id="imp-county"><option value="">Leave blank</option>' + SITE.counties.map(function (c) { return '<option' + (IMPORT.county === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div></div>' +
-    '<div class="tablewrap"><table class="list"><thead><tr><th>Company</th><th>Email</th><th>Trade</th><th>County</th></tr></thead><tbody>' + rows.slice(0, 5).map(function (r) { return '<tr><td>' + esc(r.company) + '</td><td>' + esc(r.email || r.phone) + '</td><td>' + esc(r.trades.map(tname).join(', ')) + '</td><td>' + esc(r.counties.join(', ')) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+    '<div><p class="small sub" style="margin-top:22px">' + (noPlace ? '<b>' + noPlace + ' rows have no ZIP or County and State</b>, so we won\'t know where they are. You can still add them.' : 'Every row has a ZIP or a county and state.') + '</p></div></div>' +
+    '<div class="tablewrap"><table class="list"><thead><tr><th>Company</th><th>Email</th><th>Trade</th><th>Where</th></tr></thead><tbody>' + rows.slice(0, 5).map(function (r) { return '<tr><td>' + esc(r.company) + '</td><td>' + esc(r.email || r.phone) + '</td><td>' + esc(r.trades.map(tname).join(', ')) + '</td><td>' + esc([r.town, r.county, r.state, r.zip].filter(Boolean).join(', ')) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
     (rows.length > 5 ? '<p class="small sub">And ' + (rows.length - 5) + ' more.</p>' : '') +
     '<div class="btns"><button class="btn sm" type="button" data-import>Add ' + rows.length + ' companies</button><button class="btn sm ghost" type="button" data-noimport>Start over</button></div></div>';
   return h;
@@ -312,6 +324,8 @@ function render() {
       table(FHEADS, D.fees.map(feeRow), (SITE.freeLaunch ? 'No lead fees: the site is free for contractors during the launch (freeLaunch in config.js).' : 'No paid leads yet. The first ' + SITE.freeLeads + ' chosen leads for each pro are free.'));
   }
   app.innerHTML = h;
+  var ecoEl = document.getElementById('eco-pick');
+  ECO = ecoEl ? countyPicker(ecoEl, { multi: true, id: 'eco', value: (D.contractors.filter(function (c) { return c.id === editing; })[0] || {}).counties }) : null;
 }
 async function load() {
   if (!KEY) return gate();
@@ -322,7 +336,7 @@ app.addEventListener('submit', async function (e) {
   if (e.target.id === 'editc' || e.target.id === 'invite') {
     e.preventDefault();
     var v = function (id) { return document.getElementById(id).value.trim(); }, checked = function (n) { return Array.prototype.map.call(document.querySelectorAll('input[name=' + n + ']:checked'), function (i) { return i.value; }); };
-    var body = e.target.id === 'invite' ? { action: 'invite', email: v('iemail'), name: v('iname'), trade: v('itrade'), county: v('icounty') } : { action: 'edit_contractor', id: e.target.dataset.id, company: v('ec'), license: v('el'), business_phone: v('ep'), trades: checked('et'), counties: checked('eco') };
+    var body = e.target.id === 'invite' ? { action: 'invite', email: v('iemail'), name: v('iname'), trade: v('itrade'), zip: v('izip') } : { action: 'edit_contractor', id: e.target.dataset.id, company: v('ec'), license: v('el'), business_phone: v('ep'), trades: checked('et'), counties: ECO ? ECO.get() : [] };
     try { await call(body); toast(body.action === 'invite' ? 'Invite sent.' : 'Saved.'); editing = null; if (body.action === 'invite') REC = null; await load(); } catch (x) { toast(x.message); }
     return;
   }
@@ -343,6 +357,7 @@ app.addEventListener('submit', async function (e) {
 app.addEventListener('click', async function (e) {
   var t = e.target.closest('button'); if (!t) return;
   if (t.dataset.tab) { tab = t.dataset.tab; return render(); }
+  if (t.dataset.pickstate) { FIL.state = t.dataset.pickstate; FIL.county = ''; return render(); }
   if (t.hasAttribute('data-recheck')) { SETUP = null; return render(); }
   if (t.dataset.cell) { var cp = t.dataset.cell.split('|'); var same = FIL.county === cp[0] && FIL.trade === cp[1]; FIL.county = same ? '' : cp[0]; FIL.trade = same ? '' : cp[1]; FIL.stage = 'open'; render(); if (!same) { var pl = document.getElementById('plist'); if (pl) pl.scrollIntoView({ behavior: 'smooth' }); } return; }
   if (t.hasAttribute('data-pickall')) { var L = shown(), all = L.length && L.every(function (p) { return picked[p.id]; }); L.forEach(function (p) { if (all) delete picked[p.id]; else picked[p.id] = true; }); return render(); }
@@ -401,8 +416,10 @@ app.addEventListener('click', async function (e) {
 app.addEventListener('change', function (e) {
   var el = e.target;
   if (el.dataset.pick) { if (el.checked) picked[el.dataset.pick] = true; else delete picked[el.dataset.pick]; return render(); }
-  if (el.id === 'f-trade' || el.id === 'f-county' || el.id === 'f-stage') { FIL[el.id.slice(2)] = el.value; return render(); }
-  if (el.id === 'imp-trade' || el.id === 'imp-county') { IMPORT[el.id.slice(4)] = el.value; return render(); }
+  if (el.id === 'f-trade' || el.id === 'f-stage') { FIL[el.id.slice(2)] = el.value; return render(); }
+  if (el.id === 'f-state') { FIL.state = el.value; FIL.county = ''; return render(); }
+  if (el.id === 'f-where') { if (el.value !== 'county') FIL.county = ''; FIL.state2 = el.value === 'state'; return render(); }
+  if (el.id === 'imp-trade') { IMPORT.trade = el.value; return render(); }
 });
 var searchT;
 app.addEventListener('input', function (e) {

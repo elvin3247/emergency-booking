@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/styles.css?v=6dd3076e">
+<link rel="stylesheet" href="/assets/styles.css?v=cb0bd0dc">
 <!-- head:end -->
 </head>
 <body>
@@ -21,15 +21,15 @@
 <main class="page"><div class="wrap"><div class="narrow" id="app"><p class="sub">Loading your settings...</p></div></div></main>
 <div class="toast" id="toast" role="status" hidden></div>
 <div id="site-footer"></div>
-<script src="/assets/config.js?v=041d314b"></script>
-<script src="/assets/site.js?v=ddecd3ee"></script>
+<script src="/assets/config.js?v=918e849e"></script>
+<script src="/assets/site.js?v=c4b7ce98"></script>
 <script>
 // A contractor's private page, opened from any alert or the confirmation email. No password: the link is the key.
-var app = document.getElementById('app'), Q = new URLSearchParams(location.search), t = Q.get('t'), D = null, toastT;
+var app = document.getElementById('app'), Q = new URLSearchParams(location.search), t = Q.get('t'), D = null, toastT, CP = null, CPV = null;
 function toast(m) { var el = document.getElementById('toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { el.hidden = true; }, 3500); }
 var when = function (iso) {
   if (new Date(iso).getUTCFullYear() >= 2100) return 'you turn them back on';
-  return new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit' });
 };
 
 function settingsForm(first) {
@@ -38,12 +38,12 @@ function settingsForm(first) {
     '<div><label for="business_phone">Business phone customers call</label><input type="tel" id="business_phone" autocomplete="tel" value="' + esc(D.business_phone || '') + '"></div></div>' +
     '<div><label for="alert_hours">When should we send requests?</label><select id="alert_hours">' + Object.keys(SITE.alertHours).map(function (k) { return '<option value="' + k + '"' + (k === D.alert_hours ? ' selected' : '') + '>' + SITE.alertHours[k] + '</option>'; }).join('') + '</select></div>' +
     (first ? '' : '<div><label id="trades-l">Work you do</label><div class="chips" role="group" aria-labelledby="trades-l" id="trades">' + Object.keys(SITE.trades).map(function (k) { return '<label class="chip" for="t-' + k + '"><input type="checkbox" id="t-' + k + '" value="' + k + '"' + (D.trades.indexOf(k) > -1 ? ' checked' : '') + '><span>' + SITE.trades[k].name + '</span></label>'; }).join('') + '</div><p class="small sub" style="margin-top:4px">Adding a trade? Email us the license number for it so we can check it.</p></div>') +
-    (first ? '' : '<div><label id="counties-l">Counties you serve</label><div class="chips" role="group" aria-labelledby="counties-l" id="chips">' + SITE.counties.map(function (c, i) { return '<label class="chip" for="c' + i + '"><input type="checkbox" id="c' + i + '" value="' + c + '"' + (D.counties.indexOf(c) > -1 ? ' checked' : '') + '><span>' + c + '</span></label>'; }).join('') + '</div></div>') +
+    (first ? '' : '<div><label id="counties-l">Counties you serve</label><div id="chips"></div></div>') +
     '<p class="err" id="err" role="alert" hidden></p>' +
     '<div><button class="btn" type="submit" id="go">' + (first ? 'Finish setup' : 'Save changes') + '</button></div></form>';
 }
 
-var day = function (iso) { return new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+var day = function (iso) { return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
 var showAll = false, pauseAsk = new URLSearchParams(location.search).get('pause') === 'night';
 // Every lead you've been sent, newest first. Customer details stay on each job's own page.
 function jobsCard() {
@@ -90,7 +90,7 @@ function render() {
     var paused = !!D.paused_until, pending = D.status !== 'approved';
     h = '<div class="stack"><p class="eyebrow">' + esc(D.company) + '</p><h1>Your jobs and alerts</h1></div>';
     h += pending
-      ? '<div class="notice warn"><b>We\'re checking your New Jersey license.</b> Requests start once you\'re approved. We\'ll email ' + esc(D.email) + '.</div>'
+      ? '<div class="notice warn"><b>We\'re reviewing your license.</b> Requests start once you\'re approved. We\'ll email ' + esc(D.email) + '.</div>'
       : paused
         ? '<div class="notice warn"><b>Paused until ' + esc(when(D.paused_until)) + '.</b> You won\'t get requests until then.</div>'
         : D.in_hours
@@ -112,6 +112,9 @@ function render() {
     h += '<p class="small sub">Keep this page private. Anyone with the link can change your settings.</p>';
   }
   app.innerHTML = h;
+  // The county picker keeps what they've ticked while the page redraws, until they save.
+  var cpEl = document.getElementById('chips');
+  if (cpEl) CP = countyPicker(cpEl, { multi: true, id: 'pc', value: CPV || D.counties, onChange: function (v) { CPV = v; } });
 }
 async function load() {
   try { D = await api('/api/pro?t=' + encodeURIComponent(t || '')); render(); }
@@ -147,7 +150,7 @@ app.addEventListener('submit', async function (e) {
   }
   var first = !D.setup_complete, v = function (id) { return document.getElementById(id).value.trim(); }, err = document.getElementById('err'), go = document.getElementById('go');
   var body = { t: t, action: 'settings', visit_fee: v('visit_fee'), business_phone: v('business_phone'), alert_hours: v('alert_hours') };
-  if (!first) { var picked = function (sel) { return Array.prototype.map.call(document.querySelectorAll(sel + ' input:checked'), function (i) { return i.value; }); }; body.counties = picked('#chips'); body.trades = picked('#trades'); }
+  if (!first) { var picked = function (sel) { return Array.prototype.map.call(document.querySelectorAll(sel + ' input:checked'), function (i) { return i.value; }); }; body.counties = CP ? CP.get() : D.counties; body.trades = picked('#trades'); CPV = null; }
   err.hidden = true; go.disabled = true; go.textContent = 'Saving...';
   try { D = await api('/api/pro', body); render(); toast(first ? 'Setup complete.' : 'Saved.'); if (first) { track('contractor_setup_done'); window.scrollTo(0, 0); } }
   catch (x) { err.textContent = x.message; err.hidden = false; go.disabled = false; go.textContent = first ? 'Finish setup' : 'Save changes'; }

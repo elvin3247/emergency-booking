@@ -75,7 +75,7 @@ main.page{padding-block:32px 0}
 .btn[disabled]{opacity:.6;cursor:default}
 .btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 label{font-weight:700;font-size:.92rem;display:block;margin-bottom:4px}
-input[type=text],input[type=tel],input[type=email],input[type=number],select,textarea{width:100%;font:500 1rem var(--font);color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;padding:11px 12px}
+input[type=text],input[type=tel],input[type=email],input[type=number],input[type=search],select,textarea{width:100%;font:500 1rem var(--font);color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;padding:11px 12px}
 textarea{min-height:72px;resize:vertical}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .row>div{min-width:0}
@@ -542,3 +542,33 @@ body.home .hero>.wrap{width:100%}
 @media (min-width:1200px){.herocard .book .svc{flex-wrap:nowrap}}
 /* Small laptops and tablets sideways: a touch smaller so the headline keeps its three lines next to the card. */
 @media (min-width:1000px) and (max-width:1199px){.herocard h1{font-size:5.6cqi}}
+
+/* Small phones: service tiles never run off the edge; icon sits above the words so the text has room. */
+.tiles.pair{grid-template-columns:repeat(2,minmax(0,1fr))}
+.tile{min-width:0;overflow-wrap:anywhere}
+@media (max-width:480px){.tile.svc{flex-direction:column;align-items:flex-start;gap:8px;padding:12px}}
+/* Room between a page heading and the line under it. */
+h1+.sub{margin-top:8px}
+/* Easier to tap: "by county" links under each group, and the pins on the house drawing (an invisible larger circle). */
+.hx .hub{padding:6px 0}
+.house .hit{fill:transparent;stroke:none}
+.plain-ol{margin:0;padding-left:1.3em;display:grid;gap:6px}
+
+/* ---- Nationwide: state grid, county finder on state pages, county picker in forms ---- */
+.states{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:14px}
+.states a{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;padding:11px 14px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);color:var(--ink);text-decoration:none}
+.states a b{font-weight:600}.states a .n{grid-column:2;font-size:.78rem;color:var(--muted)}.states a .n:empty{display:none}
+.states a:hover{border-color:var(--accent)}
+.finder{display:grid;gap:14px;margin-top:16px}
+.finder-top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+.finder-top input{flex:1 1 260px;max-width:420px;width:auto}
+.finder-top .legend{margin:0}
+.clist{list-style:none;margin:0;padding:0;columns:4 180px;column-gap:18px}
+.clist li{break-inside:avoid}.clist li[hidden]{display:none}
+.clist a{display:flex;gap:9px;align-items:center;padding:7px 8px;margin:0 -8px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:.95rem}
+.clist a[hidden]{display:none}
+.clist a:hover,.clist a.on{background:var(--accent-soft);color:var(--accent-deep)}
+.clist a.has{font-weight:700}
+.cp{display:grid;gap:10px}
+.cp-list{max-height:260px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:var(--r-sm)}
+.vh{position:absolute;left:-9999px}

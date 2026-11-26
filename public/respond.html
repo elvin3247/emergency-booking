@@ -13,22 +13,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="/assets/styles.css?v=6dd3076e">
+<link rel="stylesheet" href="/assets/styles.css?v=cb0bd0dc">
 <!-- head:end -->
 </head>
 <body>
 <div id="site-header"></div>
 <main class="page"><div class="wrap"><div class="narrow" id="app"><p class="sub">Loading the request...</p></div></div></main>
 <div id="site-footer"></div>
-<script src="/assets/config.js?v=041d314b"></script>
-<script src="/assets/site.js?v=ddecd3ee"></script>
+<script src="/assets/config.js?v=918e849e"></script>
+<script src="/assets/site.js?v=c4b7ce98"></script>
 <script>
 // The page a contractor opens from a job alert. Tapping an arrival time IS the yes: one tap, no form.
 var app = document.getElementById('app'), t = new URLSearchParams(location.search).get('t'), D = null, poll, editingFee = false, fee = null, busy = false;
 var tel = function (p) { return 'tel:' + String(p || '').replace(/[^\d+]/g, ''); };
 
 var MINS = [15, 30, 45, 60, 90];
-var at = function (iso) { return new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }); };
+var at = function (iso) { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
 // Let the customer know where you are. They see it on their page, and get an email for "on my way" and "running late".
 function etaCard() {
   if (D.job_result) return '';

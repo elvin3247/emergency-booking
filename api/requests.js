@@ -2,9 +2,11 @@
 // GET ?token=: the homeowner's request page reads its current state.
 const C = require('../lib/config');
 const store = require('../lib/store');
+const geo = require('../lib/geo');
+const limits = require('../lib/limits');
 const mail = require('../lib/mail');
 const E = require('../lib/emails');
-const { wrap, bad, str, isEmail, digits, token, isReady, canAlert, tradeOf, deviceHash, openedAt } = require('../lib/http');
+const { licText, wrap, bad, str, isEmail, digits, token, isReady, canAlert, tradeOf, deviceHash, openedAt } = require('../lib/http');
 const { tryAutoMatch, hasDetails, live, match } = require('../lib/match');
 const { tick } = require('../lib/tick');
 const speed = require('../lib/speed');
@@ -122,7 +124,7 @@ module.exports = wrap({
     if (body.action) return act(body);
     if (body.website) return { token: 'ok' }; // hidden field only bots fill in
     const r = {
-      service: str(body.service, 30), problem: str(body.problem, 30), zip: str(body.zip, 5), county: str(body.county, 30), timing: str(body.timing, 40), system: str(body.system, 40),
+      service: str(body.service, 30), problem: str(body.problem, 30), zip: str(body.zip, 5), county: str(body.county, 60), timing: str(body.timing, 40), system: str(body.system, 40),
       note: str(body.note, 500), name: str(body.name, 80), phone: str(body.phone, 30), email: str(body.email, 120).toLowerCase(), address: str(body.address, 160), source: str(body.source, 120) || null
     };
     if (!C.problems[r.problem]) throw bad('Choose the problem you need help with.');
@@ -131,8 +133,10 @@ module.exports = wrap({
     if (!C.services[r.service].live) throw bad("We're not taking " + C.services[r.service].name.toLowerCase() + ' requests yet.');
     const trade = tradeOf(r.service);
     if (!/^\d{5}$/.test(r.zip)) throw bad('Enter a 5-digit ZIP code.');
-    if (!/^0[78]/.test(r.zip)) throw bad("We're only in New Jersey for now. NJ ZIP codes start with 07 or 08.");
-    if (!C.counties.includes(r.county)) throw bad('Choose your county.');
+    // The county comes from the ZIP when we know it. A ZIP we don't have on file (new, or PO-box only) uses the county they picked.
+    const place = geo.zip(r.zip);
+    if (place) r.county = place.county;
+    if (!geo.valid(r.county)) throw bad("We couldn't place that ZIP code. Choose your state and county."); 
     if (!C.timings.includes(r.timing)) r.timing = C.timings[0];
     r.system = trade !== 'hvac' ? null : C.systems.includes(r.system) ? r.system : C.systems[0];
     // Name and address can come now or on the request page while pros answer.
@@ -146,10 +150,12 @@ module.exports = wrap({
 
     // Spam limit: a few requests an hour is normal for a real emergency. Dozens is not.
     r.phone_digits = digits(r.phone).slice(-10); r.device = deviceHash(headers);
-    if (process.env.RATE_LIMITS !== 'off') {
-      const since = new Date(Date.now() - 3600000).toISOString();
-      if (await store.countRequestsSince(since, { email: r.email, phone: r.phone_digits }) >= C.limits.perContactHour) throw bad('You already have requests open. Check your email for the link to your request page.', 429);
-      if (r.device && await store.countRequestsSince(since, { device: r.device }) >= C.limits.perDeviceHour) throw bad('Too many requests from this connection in the last hour. Please try again later.', 429);
+    if (limits.on()) {
+      const hour = new Date(Date.now() - 3600000).toISOString(), day = new Date(Date.now() - 864e5).toISOString(), who = r.email + ', ' + r.phone, contact = { email: r.email, phone: r.phone_digits };
+      const open = 'You already have requests open. Check your email for the link to your request page, or use "Find my request".';
+      if (await store.countRequestsSince(hour, contact) >= C.limits.perContactHour) await limits.block('request', r.device, who, open);
+      if (await store.countRequestsSince(day, contact) >= C.limits.perContactDay) await limits.block('request', r.device, who, open);
+      if (r.device && await store.countRequestsSince(hour, { device: r.device }) >= C.limits.perDeviceHour) await limits.block('request', r.device, who, 'Too many requests from this connection in the last hour. Please try again later.');
     }
 
     const row = await store.insertRequest(Object.assign(r, { photos: [], token: token(), status: 'open', consent_at: new Date().toISOString(), consent_text: C.consent.homeowner }));
@@ -172,11 +178,11 @@ module.exports = wrap({
     const stars = {};
     (await store.reviewsFor(alerts.map(a => a.contractor_id))).forEach(v => { const s = (stars[v.chosen_contractor_id] = stars[v.chosen_contractor_id] || { n: 0, sum: 0 }); s.n++; s.sum += v.rating; });
     const rating = id => (stars[id] && stars[id].n >= C.minReviews ? { avg: Math.round(stars[id].sum / stars[id].n * 10) / 10, count: stars[id].n } : null);
-    const offer = a => ({ id: a.id, pro_id: a.contractor_id, rating: rating(a.contractor_id), company: cs[a.contractor_id].company, license: cs[a.contractor_id].license, arrival: a.arrival, visit_fee: a.visit_fee, secs: Math.max(0, Math.round((new Date(a.responded_at).getTime() - opened) / 1000)) });
+    const offer = a => ({ id: a.id, pro_id: a.contractor_id, rating: rating(a.contractor_id), company: cs[a.contractor_id].company, license: licText(cs[a.contractor_id]), arrival: a.arrival, visit_fee: a.visit_fee, secs: Math.max(0, Math.round((new Date(a.responded_at).getTime() - opened) / 1000)) });
     const accepted = alerts.filter(a => a.response === 'accepted' && a.outcome !== 'no_show').sort((a, b) => new Date(a.responded_at) - new Date(b.responded_at));
     const state = r.status === 'canceled' ? 'canceled' : r.status === 'matched' ? 'matched' : now - opened > C.OPEN_MS ? 'closed' : 'open';
     const out = {
-      state, now, window_ends: opened + C.WINDOW_MS, widened_to: r.widened_at && state === 'open' ? C.neighbors[r.county] || [] : null, alerted: alerts.filter(a => a.outcome !== 'no_show').length, reopened: !!r.reopened_at,
+      state, now, window_ends: opened + C.WINDOW_MS, widened_to: r.widened_at && state === 'open' ? geo.neighbors(r.county) : null, alerted: alerts.filter(a => a.outcome !== 'no_show').length, reopened: !!r.reopened_at,
       photos: state === 'canceled' ? [] : await store.photoUrls(r.photos || []), max_photos: C.maxPhotos,
       request: { service: r.service, problem: r.problem, zip: r.zip, county: r.county, timing: r.timing, address: r.address, phone: r.phone, email: r.email },
       offers: state === 'open' ? accepted.slice(0, C.maxOffers).map(offer) : [],
@@ -195,7 +201,7 @@ module.exports = wrap({
       out.standby_ends = new Date(r.matched_at).getTime() + C.standbyMin * 60000;
     } else if (state !== 'canceled' && !accepted.length && (!out.alerted || now > out.window_ends)) {
       // Nobody confirmed: be honest and give numbers to call directly.
-      out.backup = (await store.contractorsForCounty(r.county, tradeOf(r.service) || 'hvac')).filter(isReady).slice(0, 5).map(c => ({ company: c.company, phone: c.business_phone, license: c.license }));
+      out.backup = (await store.contractorsForCounty(r.county, tradeOf(r.service) || 'hvac')).filter(isReady).slice(0, 5).map(c => ({ company: c.company, phone: c.business_phone, license: licText(c) }));
     }
     return out;
   }

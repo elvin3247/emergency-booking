@@ -17,7 +17,7 @@ module.exports = wrap({
     if (process.env.RATE_LIMITS !== 'off') {
       const since = new Date(Date.now() - 3600000).toISOString();
       if (await store.countLinkSends(since, { email }) >= 3) return DONE;
-      if (device && await store.countLinkSends(since, { device }) >= 10) throw bad('Too many tries from this connection. Please wait an hour and try again.', 429);
+      if (device && await store.countLinkSends(since, { device }) >= 10) await require('../lib/limits').block('link', device, email, 'Too many tries from this connection. Please wait an hour and try again.');
     }
     await store.logLinkSend({ email, device });
     const requests = await store.requestsByEmail(email, new Date(Date.now() - 30 * 864e5).toISOString());
