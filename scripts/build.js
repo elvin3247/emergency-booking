@@ -179,18 +179,18 @@ ${pins}</svg>
 }
 const houseSection = () => {
   const groups = problemGroups();
-  const rows = groups.map(g => '<div class="hg t-' + g.k + '"><h3>' + esc(g.name) + '</h3><ul>' +
-    g.probs.map(p => '<li><a href="' + probHref(p) + '" data-k="' + p + '"><b>' + esc(C.problems[p][0]) + '</b><span>' + esc(C.problems[p][1]) + '</span></a></li>').join('') +
-    '</ul><a class="hub" href="' + g.hub + '">' + esc(g.hubText) + '</a></div>').join('\n          ');
-  const soon = SERVICES.filter(k => !C.services[k].live).map(k => C.services[k].name.toLowerCase());
+  // Short on purpose: a heading per service (it links to that service's page) and one chip per problem. The details live on /whats-wrong.
+  const rows = groups.map(g => '<div class="hg t-' + g.k + '"><h3><a href="' + g.hub + '">' + esc(g.name) + '</a></h3><ul>' +
+    g.probs.map(p => '<li><a href="' + probHref(p) + '" data-k="' + p + '" title="' + esc(C.problems[p][1]) + '"><b>' + esc(C.problems[p][0]) + '</b></a></li>').join('') +
+    '</ul></div>').join('\n          ');
   return `<div class="hx" data-house>
         <div class="hx-text">
           <h2>Where in the house?</h2>
-          <p class="sub">Point to the trouble. Every spot is a problem our pros fix, and each one opens a request with it filled in.</p>
+          <p class="sub">Pick your problem and we\'ll start a request with it filled in.</p>
           <div class="hlist">
           ${rows}
           </div>
-          <p class="soon">${soon.length ? esc(list(soon).replace(/^./, c => c.toUpperCase())) + ' ' + (soon.length > 1 ? 'are' : 'is') + ' coming soon. ' : ''}Not sure how urgent it is? <a href="/whats-wrong">See what to do first for each problem</a>.</p>
+          <p class="soon">Not sure how urgent it is? <a href="/whats-wrong">See what to do first</a>.</p>
         </div>
         <div class="hx-art">
           ${houseSvg(groups.flatMap(g => g.probs), probHref, 'hs')}

@@ -401,17 +401,16 @@ body.home .hero .wrap{padding-block:120px 72px}
 }
 
 /* ---- Home: Where in the house? ---- */
-.hx{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:44px;align-items:start}
+.hx{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:56px;align-items:center}
 .hx-art{position:relative}
-.hlist{display:grid;grid-template-columns:1fr 1fr;gap:6px 28px;margin-top:22px}
-.hg:first-child{grid-row:span 2}
-.hg h3{font-size:1rem;margin:14px 0 4px;display:flex;gap:8px;align-items:center}.hg h3::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--t)}
-.hg ul{list-style:none;margin:0;padding:0}
-.hg li a{display:block;padding:8px 10px;margin:0 -10px;border-radius:10px;text-decoration:none;color:var(--ink)}
-.hg li a b{display:block;font-weight:700}.hg li a span{display:block;font-size:.86rem;color:var(--muted)}
-.hg li a.on,.hg li a:hover{background:var(--accent-soft);color:var(--accent-deep)}
-.hx .hub{display:inline-block;margin-top:4px;font-size:.88rem;font-weight:700;color:var(--ink)}
-.hx .soon{margin-top:22px;color:var(--muted);font-size:.92rem}
+.hlist{margin-top:28px;display:grid;gap:22px}
+.hg h3{font-size:.95rem;margin:0 0 10px;display:flex;gap:8px;align-items:center}.hg h3::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--t)}
+.hg h3 a{color:var(--ink);text-decoration:none}.hg h3 a:hover{text-decoration:underline}
+.hg ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.hg li a{display:block;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);text-decoration:none;color:var(--ink);font-size:.92rem}
+.hg li a b{font-weight:600}
+.hg li a.on,.hg li a:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-deep)}
+.hx .soon{margin-top:28px;color:var(--muted);font-size:.92rem}
 .house{width:100%;height:auto;display:block}
 .house .hatch{stroke:var(--line);stroke-width:2}.house .ground{stroke:var(--ink);stroke-width:2}
 .house .roof,.house .shell,.house .chim{fill:var(--soft);stroke:var(--ink);stroke-width:2.5;stroke-linejoin:round}
@@ -434,7 +433,7 @@ body.home .hero .wrap{padding-block:120px 72px}
 .flag.show{opacity:1}.flag::after{content:"";position:absolute;left:50%;bottom:-5px;width:10px;height:10px;background:var(--ink);transform:translateX(-50%) rotate(45deg)}
 .hx .tip{margin:8px 0 0;color:var(--muted);font-size:.88rem}
 @media (prefers-color-scheme: dark){.house .hv,.house .cl,.house .wh,.house .pl{opacity:.85}}
-@media (max-width:860px){.hx{grid-template-columns:1fr;gap:20px}.hx-text{display:contents}.hx-art{order:-1}.hx-text>h2{order:-3}.hx-text>.sub{order:-2}.hlist{grid-template-columns:1fr}.hg:first-child{grid-row:auto}
+@media (max-width:860px){.hx{grid-template-columns:1fr;gap:20px}.hx-text{display:contents}.hx-art{order:-1}.hx-text>h2{order:-3}.hx-text>.sub{order:-2}
   .house .ring{r:17}.house .dot{r:6}.house .lead{stroke-width:2}}
 
 /* ---- Home: How it works, three steps with pictures ---- */
@@ -550,7 +549,7 @@ body.home .hero>.wrap{width:100%}
 /* Room between a page heading and the line under it. */
 h1+.sub{margin-top:8px}
 /* Easier to tap: "by county" links under each group, and the pins on the house drawing (an invisible larger circle). */
-.hx .hub{padding:6px 0}
+.hg li a{padding:11px 16px}
 .house .hit{fill:transparent;stroke:none}
 .plain-ol{margin:0;padding-left:1.3em;display:grid;gap:6px}
 
